@@ -1,26 +1,142 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fbfbfa;
+  --foreground: #141413;
+  --foreground-muted: #57534e;
+  --foreground-faint: #8c857e;
+  --dot-color: #d6d3d1;
+  --dot-line: #d6d3d1;
+  --dot-cross: #a8a29e;
+  --accent: #2563eb;
+  --accent-glow: rgba(37, 99, 235, 0.12);
+  --accent-muted: #eff6ff;
+  --accent-ink: #1d4ed8;
+}
+
+.dark {
+  --background: #0f0f10;
+  --foreground: #f4f2ee;
+  --foreground-muted: #a8a29e;
+  --foreground-faint: #6e6761;
+  --dot-color: #27272a;
+  --dot-line: #2a2928;
+  --dot-cross: #524f4b;
+  --accent: #3b82f6;
+  --accent-glow: rgba(59, 130, 246, 0.16);
+  --accent-muted: #1e293b;
+  --accent-ink: #93c5fd;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: #0f0f10;
+    --foreground: #f4f2ee;
+    --foreground-muted: #a8a29e;
+    --foreground-faint: #6e6761;
+    --dot-color: #27272a;
+    --dot-line: #2a2928;
+    --dot-cross: #524f4b;
+    --accent: #3b82f6;
+    --accent-glow: rgba(59, 130, 246, 0.16);
+    --accent-muted: #1e293b;
+    --accent-ink: #93c5fd;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-muted: var(--foreground-muted);
+  --color-faint: var(--foreground-faint);
+  --color-dot: var(--dot-color);
+  --color-dash: var(--dot-line);
+  --color-cross: var(--dot-cross);
+  --color-accent: var(--accent);
+  --color-accent-muted: var(--accent-muted);
+  --color-accent-ink: var(--accent-ink);
+  --font-sans: var(--font-poppins);
+  --font-serif: var(--font-poppins);
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-poppins), "Poppins", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.012em;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Family.co Signature Dot Matrix Canvas */
+.bg-dot-matrix {
+  background-image: radial-gradient(circle, var(--dot-color) 1.25px, transparent 1.25px);
+  background-size: 24px 24px;
+}
+
+/* Dotted Border Utilities */
+.border-dotted-grid {
+  border-style: dotted;
+  border-width: 1px;
+  border-color: var(--dot-line);
+}
+
+/* Glass & Glow Pills */
+.pill-surface {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(14px);
+  border: 1px dotted var(--dot-line);
+}
+
+.dark .pill-surface {
+  background: rgba(18, 18, 20, 0.75);
+  backdrop-filter: blur(14px);
+  border: 1px dotted var(--dot-line);
+}
+
+/* Pop-in animation */
+@keyframes softPopIn {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.006);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-pop-in {
+  animation: softPopIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Animated dot travelling along line */
+@keyframes pulseDot {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+/* Accessible reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
