@@ -10,15 +10,44 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "PolicyExtract | Company Policy Intelligence via Grounded RAG",
+  title: "PolicyExtract | Company Policy Reader",
   description:
-    "Extract unambiguous company policies, compliance obligations, and clause-level citations from raw documents with advanced RAG.",
+    "Turn company documents and scanned policies into clear, page-cited knowledge.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+const themeScript = `(function() {
+  try {
+    var stored = localStorage.getItem('policy_theme');
+    var isDark = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  } catch (e) {}
+})();`;
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en" className={`${poppins.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col font-sans">
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${poppins.variable} h-full antialiased`}
+    >
+      <body
+        suppressHydrationWarning
+        className="min-h-full flex flex-col font-sans"
+      >
+        <script
+          id="policy-theme-init"
+          async
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: themeScript }}
+        />
         <Providers>{children}</Providers>
       </body>
     </html>

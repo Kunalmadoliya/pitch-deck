@@ -22,5 +22,6 @@ describe("validateUpload", () => {
   it("rejects paths outside the authenticated user's folder", () => {
     expect(isInsideUserFolder(validUpload.filePath, "user-2")).toBe(false);
     expect(isInsideUserFolder("/policy-docs/user-1/../user-2/file.pdf", "user-1")).toBe(false);
+    expect(isInsideUserFolder("/policy-docs/user-1/%2e%2e/user-2/file.pdf", "user-1")).toBe(false);
   });
 });

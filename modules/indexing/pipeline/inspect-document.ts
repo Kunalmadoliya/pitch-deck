@@ -4,6 +4,7 @@ import { getPdfPageCount } from "../extraction/get-pdf-page-count";
 import type { FileKind } from "../types";
 import { InvalidUploadError } from "../errors";
 import { isInsideUserFolder } from "../upload/validate-upload";
+import { detectMimeFromBytes } from "../detection/detect-mime-from-bytes";
 
 export async function inspectDocument(
   storage: Storage,
@@ -22,6 +23,9 @@ export async function inspectDocument(
   }
   const kind = detectFileKind(details.mimeType);
   const data = await storage.read(document.storageFileId);
+  if (detectMimeFromBytes(data) !== details.mimeType) {
+    throw new InvalidUploadError("InvalidUploadError: file content does not match metadata");
+  }
   const pageCount = kind === "pdf" ? await getPdfPageCount(data) : 1;
   return { pageCount, kind };
 }

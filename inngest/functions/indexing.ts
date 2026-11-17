@@ -11,6 +11,7 @@ import { logIndexingEvent, withIndexingLogging } from "@/modules/indexing/logger
 import { prisma } from "@/lib/prisma";
 import { inngest } from "../client";
 import { NonRetriableError } from "inngest";
+import { isInsideUserFolder } from "@/modules/indexing/upload/validate-upload";
 
 export const indexDocument = inngest.createFunction(
   {
@@ -29,9 +30,13 @@ export const indexDocument = inngest.createFunction(
       if (document && error.message.includes("InvalidUploadError")) {
         await step.run("delete-invalid-upload", async () => {
           try {
-            await withIndexingLogging(documentId, "delete-invalid-upload", () =>
-              createStorage().remove(document.storageFileId),
-            );
+            await withIndexingLogging(documentId, "delete-invalid-upload", async () => {
+              const storage = createStorage();
+              const details = await storage.getFileDetails(document.storageFileId);
+              if (isInsideUserFolder(details.filePath, document.userId)) {
+                await storage.remove(document.storageFileId);
+              }
+            });
           } catch (cleanupError) {
             logIndexingEvent("error", {
               documentId,
@@ -40,6 +45,12 @@ export const indexDocument = inngest.createFunction(
             });
           }
         });
+        await step.run("delete-invalid-document", () =>
+          withIndexingLogging(documentId, "delete-invalid-document", () =>
+            repo.deleteOwned(documentId, document.userId),
+          ),
+        );
+        return;
       }
       await step.run("mark-failed", () =>
         withIndexingLogging(documentId, "mark-failed", () => repo.fail(documentId, sanitizeErrorMessage(error))),

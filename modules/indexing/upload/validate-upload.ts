@@ -15,5 +15,19 @@ export function validateUpload(input: unknown) {
 
 export function isInsideUserFolder(filePath: string, userId: string): boolean {
   const prefix = `${UPLOAD_FOLDER_PREFIX}/${userId}/`;
-  return filePath.startsWith(prefix) && !filePath.split("/").includes("..");
+  return (
+    filePath.startsWith(prefix) &&
+    !filePath.split("/").some((segment) => segment === ".." || segment.toLowerCase() === "%2e%2e")
+  );
+}
+
+export function sanitizeFileName(name: string): string {
+  const sanitized = name
+    .trim()
+    .replace(/[\\/]/g, "")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/^\.+/, "")
+    .slice(0, 200)
+    .trim();
+  return sanitized || "document";
 }

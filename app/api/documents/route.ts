@@ -1,8 +1,8 @@
 import { auth } from "@/auth/auth";
 import { prisma } from "@/lib/prisma";
 import { inngest } from "@/inngest";
-import { validateUpload } from "@/modules/indexing/upload/validate-upload";
-import { isInsideUserFolder } from "@/modules/indexing/upload/validate-upload";
+import { createStorage } from "@/modules/indexing/storage/create-storage";
+import { isInsideUserFolder, sanitizeFileName, validateUpload } from "@/modules/indexing/upload/validate-upload";
 import { DocumentStatus, IndexingStage } from "@/lib/generated/prisma/client";
 
 export async function POST(request: Request): Promise<Response> {
@@ -28,14 +28,30 @@ export async function POST(request: Request): Promise<Response> {
       { status: 202 },
     );
   }
+  let details;
+  try {
+    details = await createStorage().getFileDetails(input.fileId);
+  } catch {
+    return Response.json({ error: "Unable to verify uploaded file" }, { status: 403 });
+  }
+  if (
+    details.fileId !== input.fileId ||
+    details.filePath !== input.filePath ||
+    !isInsideUserFolder(details.filePath, session.user.id) ||
+    details.sizeBytes !== input.sizeBytes ||
+    details.mimeType !== input.mimeType ||
+    !details.isPrivateFile
+  ) {
+    return Response.json({ error: "Uploaded file ownership or metadata is invalid" }, { status: 403 });
+  }
   const document = await prisma.document.create({
     data: {
-      storageFileId: input.fileId,
+      storageFileId: details.fileId,
       userId: session.user.id,
-      fileName: input.fileName,
-      mimeType: input.mimeType,
-      sizeBytes: input.sizeBytes,
-      storagePath: input.filePath,
+      fileName: sanitizeFileName(input.fileName),
+      mimeType: details.mimeType,
+      sizeBytes: details.sizeBytes,
+      storagePath: details.filePath,
       status: DocumentStatus.UPLOADED,
       stage: IndexingStage.QUEUED,
     },
