@@ -12,6 +12,7 @@
   "dependencies": {
     "@base-ui/react": "^1.9.0",
     "@imagekit/next": "^2.1.6",
+    "@imagekit/nodejs": "^7.15.0",
     "@langchain/core": "^1.4.1",
     "@langchain/openai": "^1.8.4",
     "@langchain/textsplitters": "^1.0.2",

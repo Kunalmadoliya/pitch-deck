@@ -12,9 +12,9 @@ import { upsertChunks } from "../vector-store/upsert-chunks";
 export async function processPageBatch(
   storage: Storage,
   repo: ReturnType<typeof import("../repository/document-repo").createDocumentRepo>,
-  input: { documentId: string; userId: string; fileName: string; storagePath: string; kind: FileKind; pageNumbers: number[] },
+  input: { documentId: string; userId: string; fileName: string; storageFileId: string; kind: FileKind; pageNumbers: number[] },
 ): Promise<{ pages: number; chunks: number }> {
-  const data = await storage.read(input.storagePath);
+  const data = await storage.read(input.storageFileId);
   await repo.setStage(input.documentId, IndexingStage.EXTRACTING);
   const pages = await extractPages(data, input.kind, input.pageNumbers);
   await repo.setStage(input.documentId, IndexingStage.CHUNKING);

@@ -1,5 +1,13 @@
+export interface StoredFileDetails {
+  fileId: string;
+  filePath: string;
+  mimeType: string;
+  sizeBytes: number;
+  isPrivateFile: boolean;
+}
+
 export interface Storage {
-  save(fileName: string, data: Uint8Array): Promise<string>;
-  read(storagePath: string): Promise<Buffer>;
-  remove(storagePath: string): Promise<void>;
+  getFileDetails(fileId: string): Promise<StoredFileDetails>;
+  read(fileId: string): Promise<Buffer>;
+  remove(fileId: string): Promise<void>;
 }

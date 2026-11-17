@@ -1,44 +1,48 @@
 import { auth } from "@/auth/auth";
 import { prisma } from "@/lib/prisma";
 import { inngest } from "@/inngest";
-import { indexingConfig } from "@/modules/indexing/config";
-import { saveUpload } from "@/modules/indexing/upload/save-upload";
 import { validateUpload } from "@/modules/indexing/upload/validate-upload";
-import { LocalStorage } from "@/modules/indexing/storage/local-storage";
+import { isInsideUserFolder } from "@/modules/indexing/upload/validate-upload";
 import { DocumentStatus, IndexingStage } from "@/lib/generated/prisma/client";
-
-const storage = new LocalStorage(indexingConfig.UPLOAD_DIR);
 
 export async function POST(request: Request): Promise<Response> {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  const formData = await request.formData();
-  const file = formData.get("file");
-  if (!(file instanceof File)) return Response.json({ error: "A file is required" }, { status: 400 });
-
-  let input;
+  let input: ReturnType<typeof validateUpload>;
   try {
-    input = validateUpload({ fileName: file.name, mimeType: file.type, sizeBytes: file.size });
+    input = validateUpload(await request.json());
   } catch {
-    return Response.json({ error: "Invalid file type or size" }, { status: 400 });
+    return Response.json({ error: "Invalid document registration" }, { status: 400 });
   }
-
-  const storagePath = await saveUpload(storage, input.fileName, new Uint8Array(await file.arrayBuffer()));
+  if (!isInsideUserFolder(input.filePath, session.user.id)) {
+    return Response.json({ error: "File path is outside the user folder" }, { status: 403 });
+  }
+  const existing = await prisma.document.findUnique({ where: { storageFileId: input.fileId } });
+  if (existing) {
+    if (existing.userId !== session.user.id) {
+      return Response.json({ error: "File is already registered" }, { status: 409 });
+    }
+    return Response.json(
+      { documentId: existing.id, status: existing.status, stage: existing.stage },
+      { status: 202 },
+    );
+  }
   const document = await prisma.document.create({
     data: {
+      storageFileId: input.fileId,
       userId: session.user.id,
       fileName: input.fileName,
       mimeType: input.mimeType,
       sizeBytes: input.sizeBytes,
-      storagePath,
+      storagePath: input.filePath,
       status: DocumentStatus.UPLOADED,
       stage: IndexingStage.QUEUED,
     },
     select: { id: true, status: true, stage: true },
   });
   await inngest.send({ name: "document/uploaded", data: { documentId: document.id, userId: session.user.id } });
-  return Response.json(document, { status: 202 });
+  return Response.json({ documentId: document.id }, { status: 202 });
 }
 
 export async function GET(request: Request): Promise<Response> {

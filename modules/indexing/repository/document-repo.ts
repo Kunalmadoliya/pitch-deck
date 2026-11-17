@@ -5,6 +5,9 @@ export function createDocumentRepo(database: PrismaClient) {
     getById(id: string) {
       return database.document.findUnique({ where: { id } });
     },
+    getByStorageFileId(storageFileId: string) {
+      return database.document.findUnique({ where: { storageFileId } });
+    },
     listByUser(userId: string) {
       return database.document.findMany({
         where: { userId },

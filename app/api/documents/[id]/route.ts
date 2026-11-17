@@ -1,11 +1,8 @@
 import { auth } from "@/auth/auth";
 import { prisma } from "@/lib/prisma";
-import { indexingConfig } from "@/modules/indexing/config";
-import { LocalStorage } from "@/modules/indexing/storage/local-storage";
+import { createStorage } from "@/modules/indexing/storage/create-storage";
 import { createPineconeIndex } from "@/modules/indexing/vector-store/pinecone-client";
 import { deleteDocumentVectors } from "@/modules/indexing/vector-store/delete-document-vectors";
-
-const storage = new LocalStorage(indexingConfig.UPLOAD_DIR);
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -41,8 +38,16 @@ export async function DELETE(request: Request, context: RouteContext): Promise<R
   const { id } = await context.params;
   const document = await prisma.document.findFirst({ where: { id, userId: session.user.id } });
   if (!document) return Response.json({ error: "Not found" }, { status: 404 });
-  await deleteDocumentVectors(createPineconeIndex(), session.user.id, id);
-  await storage.remove(document.storagePath);
+  try {
+    await deleteDocumentVectors(createPineconeIndex(), session.user.id, id);
+  } catch {
+    return Response.json({ error: "Unable to delete indexed vectors" }, { status: 502 });
+  }
+  try {
+    await createStorage().remove(document.storageFileId);
+  } catch {
+    return Response.json({ error: "Unable to delete stored file" }, { status: 502 });
+  }
   await prisma.document.delete({ where: { id } });
   return new Response(null, { status: 204 });
 }

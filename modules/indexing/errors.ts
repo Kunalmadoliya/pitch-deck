@@ -22,3 +22,23 @@ export class EmbeddingError extends IndexingError {
     super(message, "EMBEDDING_FAILED", options);
   }
 }
+
+export class InvalidUploadError extends IndexingError {
+  constructor(message = "InvalidUploadError: upload metadata mismatch") {
+    super(message, "INVALID_UPLOAD");
+  }
+}
+
+export class StorageError extends IndexingError {
+  constructor(message = "ImageKit storage operation failed", options?: ErrorOptions) {
+    super(message, "STORAGE_FAILED", options);
+  }
+}
+
+export function sanitizeErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? `${error.name}: ${error.message}` : "Indexing failed";
+  return message
+    .replace(/https?:\/\/\S+/gi, "[redacted-url]")
+    .replace(/[?&][^\s]+/g, "")
+    .slice(0, 500);
+}

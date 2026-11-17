@@ -53,6 +53,7 @@ enum PageSource {
 
 model Document {
   id             String         @id @default(cuid())
+  storageFileId  String         @unique
   userId         String
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   fileName       String
