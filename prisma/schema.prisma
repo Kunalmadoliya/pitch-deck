@@ -22,9 +22,104 @@ model User {
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
+  documents     Document[]
+  conversations Conversation[]
 
   @@unique([email])
   @@map("user")
+}
+
+enum DocumentStatus {
+  UPLOADED
+  PROCESSING
+  INDEXED
+  FAILED
+}
+
+enum IndexingStage {
+  QUEUED
+  INSPECTING
+  EXTRACTING
+  CHUNKING
+  EMBEDDING
+  UPSERTING
+  DONE
+}
+
+enum PageSource {
+  TEXT_LAYER
+  OCR
+}
+
+model Document {
+  id             String         @id @default(cuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName       String
+  mimeType       String
+  sizeBytes      Int
+  storagePath    String
+  status         DocumentStatus @default(UPLOADED)
+  stage          IndexingStage  @default(QUEUED)
+  pageCount      Int?
+  pagesProcessed Int            @default(0)
+  chunkCount     Int            @default(0)
+  errorMessage   String?
+  indexedAt      DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  pages          DocumentPage[]
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@map("document")
+}
+
+model DocumentPage {
+  id            String     @id @default(cuid())
+  documentId    String
+  document      Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  pageNumber    Int
+  source        PageSource
+  ocrConfidence Float?
+  charCount     Int
+  chunkCount    Int        @default(0)
+  createdAt     DateTime   @default(now())
+
+  @@unique([documentId, pageNumber])
+  @@map("document_page")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model Conversation {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  messages  Message[]
+
+  @@index([userId, updatedAt])
+  @@map("conversation")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           MessageRole
+  content        String       @db.Text
+  citations      Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("message")
 }
 
 model Session {
