@@ -37,6 +37,7 @@ export async function* runQueryPipeline(input: {
   const context = buildContext(ranked);
   const dataContext = [context.text, ...facts.map((fact) => `FACT documentId=${fact.documentId ?? "none"} ${fact.text}`)].filter(Boolean).join("\n");
   if (!ranked.length && !facts.length) {
+    yield { type: "token", text: NO_ANSWER };
     yield { type: "complete", answer: NO_ANSWER, chunks: [], context: "", citations: [] };
     return;
   }

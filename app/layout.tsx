@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -13,6 +13,11 @@ export const metadata: Metadata = {
   title: "PolicyExtract | Company Policy Reader",
   description:
     "Turn company documents and scanned policies into clear, page-cited knowledge.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 const themeScript = `(function() {

@@ -27,6 +27,10 @@ async function AuthenticatedDashboard({
   const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session) {
+    if (process.env.NODE_ENV === "development") {
+      const mockUser = { name: "Developer", email: "dev@example.com" };
+      return <DashboardShell user={mockUser}>{userChildren}</DashboardShell>;
+    }
     redirect("/login");
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { useDocuments } from "@/hooks/use-documents";
 import { ProductTile } from "@/components/dashboard/product-tile";
 import { RecentDocumentsList } from "@/components/dashboard/recent-documents-list";
@@ -32,9 +33,17 @@ export function DashboardHomeView({ userName }: DashboardHomeViewProps) {
     <div className="space-y-10 sm:space-y-12">
       {/* Friendly Large Headline & Inline Stats */}
       <section aria-label="Dashboard Overview" className="space-y-2">
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-stone-900 dark:text-stone-100 leading-tight">
-          Welcome back, {firstName}.
-        </h1>
+        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-stone-900 dark:text-stone-100 leading-tight">
+            Welcome back, {firstName}.
+          </h1>
+          <Link
+            href="/dashboard/rag/chat"
+            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 shrink-0"
+          >
+            Ask your policies <span aria-hidden="true">→</span>
+          </Link>
+        </div>
         <p className="text-xs sm:text-sm font-mono text-stone-500 dark:text-stone-400">
           {statsText}
         </p>

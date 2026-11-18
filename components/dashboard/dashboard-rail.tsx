@@ -40,7 +40,12 @@ export function DashboardRail({ user }: DashboardRailProps) {
     {
       label: "Document RAG",
       href: "/dashboard/rag",
-      active: pathname.startsWith("/dashboard/rag"),
+      active: pathname === "/dashboard/rag",
+    },
+    {
+      label: "Policy Chat",
+      href: "/dashboard/rag/chat",
+      active: pathname.startsWith("/dashboard/rag/chat"),
     },
   ];
 

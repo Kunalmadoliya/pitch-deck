@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { auth } from "@/auth/auth";
 import { prisma } from "@/lib/prisma";
-import { queryConfig } from "@/modules/query/config";
 import { checkRateLimit } from "@/modules/query/rate-limit";
 import { saveAssistantMessage, saveUserMessage } from "@/modules/query/history/save-messages";
 import { runOutputGuard } from "@/modules/query/guardrails/output/run-output-guard";
@@ -9,9 +8,7 @@ import { runQueryPipeline } from "@/modules/query/pipeline/run-query-pipeline";
 import { GuardrailBlockedError } from "@/modules/query/errors";
 import { QueryError } from "@/modules/query/errors";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const maxDuration = queryConfig.MAX_DURATION;
+export const maxDuration = 60;
 const bodySchema = z.object({ conversationId: z.string().optional(), message: z.string(), documentIds: z.array(z.string()).optional() });
 const encoder = new TextEncoder();
 function event(type: string, data: unknown): Uint8Array { return encoder.encode(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`); }
