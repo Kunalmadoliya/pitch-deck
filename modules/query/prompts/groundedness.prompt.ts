@@ -1,0 +1,1 @@
+export const groundednessPrompt = (answer: string, context: string): string => `Is every claim in this answer supported by the policy data? Return grounded and unsupportedClaims.\nDATA:\n${context}\nANSWER:\n${answer}`;

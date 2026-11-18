@@ -1,0 +1,1 @@
+export const routerPrompt = (question: string): string => `Route this request as content, metadata, or both. Metadata intents are only list_documents, count_documents, document_status, recent_documents.\n${question}`;
