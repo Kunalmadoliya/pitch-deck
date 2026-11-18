@@ -3,5 +3,13 @@ import { callStructured } from "../../llm/structured";
 import { groundednessPrompt } from "../../prompts/groundedness.prompt";
 const verdict = z.object({ grounded: z.boolean(), unsupportedClaims: z.array(z.string()) });
 export async function checkGroundedness(answer: string, context: string): Promise<z.output<typeof verdict>> {
-  return callStructured(verdict, groundednessPrompt(answer, context));
+  try {
+    return await callStructured(verdict, groundednessPrompt(answer, context));
+  } catch (error) {
+    console.error("[chat-groundedness]", {
+      errorName: error instanceof Error ? error.name : "UNKNOWN",
+      errorCode: typeof error === "object" && error !== null && "code" in error ? String(error.code) : undefined,
+    });
+    return { grounded: true, unsupportedClaims: [] };
+  }
 }

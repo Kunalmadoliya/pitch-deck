@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 
-export function useAutoScroll(isStreaming: boolean) {
+export function useAutoScroll(isStreaming: boolean, streamedText = "") {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [userScrolledUp, setUserScrolledUp] = useState(false);
 
@@ -28,7 +28,7 @@ export function useAutoScroll(isStreaming: boolean) {
     if (isStreaming && !userScrolledUp) {
       scrollToBottom(false);
     }
-  }, [isStreaming, userScrolledUp, scrollToBottom]);
+  }, [isStreaming, streamedText, userScrolledUp, scrollToBottom]);
 
   return {
     containerRef,

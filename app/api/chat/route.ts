@@ -38,7 +38,8 @@ export async function POST(request: Request): Promise<Response> {
         }
         if (!completed) throw new Error("Pipeline did not complete");
         const checked = await runOutputGuard(completed.answer, completed.chunks, completed.context);
-        const answer = checked.valid ? completed.answer : "I couldn't verify this answer against your documents.";
+        console.info("[chat-output-guard]", { valid: checked.valid, reason: checked.reason });
+        const answer = checked.answer ?? (checked.valid ? completed.answer : "I couldn't verify this answer against your documents.");
         if (!checked.valid) controller.enqueue(event("replace", { text: answer }));
         const messageId = await saveAssistantMessage(conversationId, answer, checked.valid ? checked.citations : []);
         controller.enqueue(event("final", { conversationId, messageId, citations: checked.valid ? checked.citations : [], verdict: checked.valid ? "passed" : "replaced" }));
@@ -49,6 +50,11 @@ export async function POST(request: Request): Promise<Response> {
           : error instanceof QueryError && error.code === "RETRIEVAL_FAILED"
             ? "retrieval_failed"
             : "generation_failed";
+        console.error("[chat-api] pipeline failed", {
+          code,
+          errorName: error instanceof Error ? error.name : "UNKNOWN",
+          errorMessage: error instanceof Error ? error.message : "UNKNOWN",
+        });
         controller.enqueue(event("error", { code, message: code === "blocked_by_guardrail" ? "I can't help with that request." : "Unable to answer right now." }));
         controller.enqueue(event("done", {})); controller.close();
       }

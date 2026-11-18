@@ -9,6 +9,7 @@ import { streamChatApi } from "@/lib/api/chat-stream-fetcher";
 interface UseChatStreamOptions {
   conversationId?: string;
   initialMessages?: MessageItem[];
+  isInitialLoading?: boolean;
   onNewConversation?: (newId: string) => void;
 }
 
@@ -17,6 +18,7 @@ const EMPTY_MESSAGES: MessageItem[] = [];
 export function useChatStream({
   conversationId,
   initialMessages = EMPTY_MESSAGES,
+  isInitialLoading = false,
   onNewConversation,
 }: UseChatStreamOptions = {}) {
   const queryClient = useQueryClient();
@@ -25,17 +27,21 @@ export function useChatStream({
   const [currentStage, setCurrentStage] = useState<QueryStage | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<{ code: string; message: string } | null>(null);
+  const activeConversationRef = useRef(conversationId);
+  const hydratedConversationRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const frame = requestAnimationFrame(() => {
+    if (isStreaming || isInitialLoading) return;
+    const key = conversationId ?? "__new";
+    if (hydratedConversationRef.current !== key) {
+      hydratedConversationRef.current = key;
+      activeConversationRef.current = conversationId;
       setMessages(initialMessages);
       setStreamingContent("");
       setCurrentStage(null);
-      setIsStreaming(false);
       setError(null);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [initialMessages]);
+    }
+  }, [conversationId, initialMessages, isInitialLoading, isStreaming]);
 
   const abortRef = useRef<AbortController | null>(null);
   const bufferRef = useRef("");
@@ -89,8 +95,12 @@ export function useChatStream({
         await streamChatApi(
           { conversationId: activeConvId, message: trimmed, documentIds, signal: controller.signal },
           {
-            onStatus: (e) => setCurrentStage(e.stage),
+            onStatus: (e) => {
+              console.info("[chat] status", e.stage);
+              setCurrentStage(e.stage);
+            },
             onToken: (e) => {
+              console.info("[chat] token", e.text.length);
               bufferRef.current += e.text;
               text += e.text;
               if (!rafRef.current) {
@@ -102,14 +112,27 @@ export function useChatStream({
             },
             onReplace: (e) => { text = e.text; bufferRef.current = ""; setStreamingContent(e.text); },
             onFinal: (e) => {
+              console.info("[chat] final", {
+                conversationId: Boolean(e.conversationId),
+                messageId: Boolean(e.messageId),
+                citationCount: e.citations.length,
+                verdict: e.verdict,
+              });
               activeConvId = e.conversationId;
               finalMsgId = e.messageId;
               finalCitations = e.citations;
+              activeConversationRef.current = e.conversationId;
               if (!conversationId && e.conversationId && onNewConversation) onNewConversation(e.conversationId);
               queryClient.invalidateQueries({ queryKey: conversationKeys.lists() });
             },
-            onError: (e) => setError({ code: e.code, message: e.message || errorMessage(e.code) }),
-            onDone: () => flush(),
+            onError: (e) => {
+              console.error("[chat] error", e.code);
+              setError({ code: e.code, message: e.message || errorMessage(e.code) });
+            },
+            onDone: () => {
+              console.info("[chat] done");
+              flush();
+            },
           },
         );
         flush();
@@ -121,6 +144,7 @@ export function useChatStream({
         }
       } catch (err: unknown) {
         if (!controller.signal.aborted) {
+          console.error("[chat] request failed", err instanceof Error ? err.name : "UNKNOWN");
           setError({ code: "error", message: err instanceof Error ? err.message : errorMessage("generation_failed") });
         }
       } finally {

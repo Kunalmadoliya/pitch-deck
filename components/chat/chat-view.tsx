@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ArrowDown, Menu, X, ShieldCheck } from "lucide-react";
 import { useConversation } from "@/hooks/use-conversation";
 import { useChatStream } from "@/hooks/use-chat-stream";
@@ -18,7 +17,6 @@ interface ChatViewProps {
 }
 
 export function ChatView({ conversationId }: ChatViewProps) {
-  const router = useRouter();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const { data: conversationData, isLoading: isLoadingInitial } = useConversation(conversationId);
 
@@ -35,10 +33,11 @@ export function ChatView({ conversationId }: ChatViewProps) {
   } = useChatStream({
     conversationId,
     initialMessages: conversationData?.messages,
-    onNewConversation: (id) => router.replace(`/dashboard/rag/chat/${id}`, { scroll: false }),
+    isInitialLoading: isLoadingInitial,
+    onNewConversation: (id) => window.history.replaceState(null, "", `/dashboard/rag/chat/${id}`),
   });
 
-  const { containerRef, showJumpToLatest, scrollToBottom, handleScroll } = useAutoScroll(isStreaming);
+  const { containerRef, showJumpToLatest, scrollToBottom, handleScroll } = useAutoScroll(isStreaming, streamingContent);
 
   const hasMessages = messages.length > 0 || isStreaming;
 
@@ -135,6 +134,26 @@ export function ChatView({ conversationId }: ChatViewProps) {
                   />
                 );
               })}
+              {isStreaming && (
+                <MessageAssistant
+                  key="streaming-assistant"
+                  content={streamingContent}
+                  isStreaming
+                  currentStage={currentStage}
+                  isLatest
+                  citations={[]}
+                />
+              )}
+              {!isStreaming && error && messages[messages.length - 1]?.role === "USER" && (
+                <MessageAssistant
+                  key="chat-error"
+                  content=""
+                  errorCode={error.code}
+                  onRetry={retry}
+                  isLatest
+                  citations={[]}
+                />
+              )}
             </div>
           )}
         </div>

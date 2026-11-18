@@ -4,7 +4,7 @@ export async function upsertChunks(
   index: {
     namespace: (name: string) => {
       documents: {
-        upsert: (options: { documents: Array<{ _id: string; chunk_text: string; title: string }> }) => Promise<unknown>;
+        upsert: (options: { documents: Array<{ _id: string; chunk_text: string; title: string } & Record<string, string | number>> }) => Promise<unknown>;
       };
     };
   },
@@ -18,6 +18,7 @@ export async function upsertChunks(
       _id: record.id,
       chunk_text: record.text,
       title: record.title,
+      ...(record.metadata ?? {}),
     })),
   });
 }

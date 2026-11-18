@@ -7,6 +7,7 @@ import type { Storage } from "../storage/storage.interface";
 import type { FileKind } from "../types";
 import { createPineconeIndex } from "../vector-store/pinecone-client";
 import { upsertChunks } from "../vector-store/upsert-chunks";
+import { buildMetadata } from "../vector-store/build-metadata";
 
 export async function processPageBatch(
   storage: Storage,
@@ -24,6 +25,11 @@ export async function processPageBatch(
     id: `${input.documentId}:${chunk.pageNumber}:${chunk.chunkIndex}`,
     text: chunk.text,
     title: input.fileName,
+    metadata: buildMetadata(chunk, {
+      id: input.documentId,
+      userId: input.userId,
+      fileName: input.fileName,
+    }),
   }));
   await repo.setStage(input.documentId, IndexingStage.UPSERTING);
   await upsertChunks(createPineconeIndex(), input.userId, records);

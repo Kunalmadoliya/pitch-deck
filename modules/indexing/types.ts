@@ -20,6 +20,7 @@ export interface VectorRecord {
   id: string;
   text: string;
   title: string;
+  metadata?: Record<string, string | number>;
 }
 
 export interface BatchSummary {
