@@ -17,12 +17,17 @@ export const metadata: Metadata = {
 
 const themeScript = `(function() {
   try {
-    var stored = localStorage.getItem('policy_theme');
+    var params = new URLSearchParams(window.location.search);
+    var urlTheme = params.get('theme');
+    var stored = urlTheme || localStorage.getItem('policy_theme');
     var isDark = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
     if (isDark) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
+    }
+    if (urlTheme) {
+      localStorage.setItem('policy_theme', urlTheme);
     }
   } catch (e) {}
 })();`;

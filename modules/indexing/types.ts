@@ -18,8 +18,8 @@ export interface Chunk {
 
 export interface VectorRecord {
   id: string;
-  values: number[];
-  metadata: Record<string, string | number>;
+  text: string;
+  title: string;
 }
 
 export interface BatchSummary {

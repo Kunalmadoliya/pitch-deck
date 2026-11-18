@@ -5,7 +5,6 @@ import { createEmbedder } from "../embeddings/embedder";
 import { extractPages } from "../extraction/extract-pages";
 import type { Storage } from "../storage/storage.interface";
 import type { FileKind } from "../types";
-import { buildMetadata } from "../vector-store/build-metadata";
 import { createPineconeIndex } from "../vector-store/pinecone-client";
 import { upsertChunks } from "../vector-store/upsert-chunks";
 
@@ -21,14 +20,10 @@ export async function processPageBatch(
   const chunks = (await Promise.all(pages.map((page) => chunkPage(page)))).flat();
   await repo.setStage(input.documentId, IndexingStage.EMBEDDING);
   const embedder = createEmbedder();
-  const records = await embedChunks(chunks, embedder, (chunk, values) => ({
+  const records = await embedChunks(chunks, embedder, (chunk) => ({
     id: `${input.documentId}:${chunk.pageNumber}:${chunk.chunkIndex}`,
-    values,
-    metadata: buildMetadata(chunk, {
-      id: input.documentId,
-      userId: input.userId,
-      fileName: input.fileName,
-    }),
+    text: chunk.text,
+    title: input.fileName,
   }));
   await repo.setStage(input.documentId, IndexingStage.UPSERTING);
   await upsertChunks(createPineconeIndex(), input.userId, records);
