@@ -43,9 +43,12 @@ export function ChatView({ conversationId }: ChatViewProps) {
   const hasMessages = messages.length > 0 || isStreaming;
 
   return (
-    <div className="relative flex h-[calc(100vh-6rem)] sm:h-[calc(100vh-7rem)] gap-6 -my-4 sm:-my-6">
+    <div className="relative flex h-screen min-h-[560px] overflow-hidden bg-[#fbfbfa] dark:bg-[#0f0f10]">
       {/* Desktop Conversation Sidebar */}
-      <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-dashed border-stone-200 dark:border-stone-800 pr-5 py-2">
+      <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-stone-200/90 dark:border-stone-800/90 px-4 py-5">
+        <div className="mb-5 px-1">
+          <p className="text-[11px] font-medium text-stone-400">Policy workspace</p>
+        </div>
         <ConversationList currentId={conversationId} />
       </aside>
 
@@ -72,7 +75,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
       {/* Chat Thread Container */}
       <div className="flex-1 flex flex-col min-w-0 h-full relative">
         {/* Top Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-dashed border-stone-200 dark:border-stone-800 text-xs shrink-0">
+        <div className="h-16 px-4 sm:px-6 flex items-center justify-between border-b border-stone-200/90 dark:border-stone-800/90 text-xs shrink-0">
           <div className="flex items-center gap-2.5 text-stone-500">
             <button
               type="button"
@@ -101,7 +104,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto py-6 space-y-6 px-1 sm:px-4"
+          className="flex-1 overflow-y-auto py-6 px-4 sm:px-8"
         >
           {isLoadingInitial && !hasMessages ? (
             <div className="space-y-4 py-8 max-w-xl mx-auto">
@@ -111,7 +114,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
           ) : !hasMessages ? (
             <EmptyState onSelectPrompt={(p) => sendMessage(p)} />
           ) : (
-            <div className="max-w-3xl mx-auto w-full space-y-6">
+            <div className="max-w-3xl mx-auto w-full space-y-7">
               {messages.map((msg, index) => {
                 const isLast = index === messages.length - 1;
                 if (msg.role === "USER") {
@@ -149,8 +152,10 @@ export function ChatView({ conversationId }: ChatViewProps) {
         )}
 
         {/* Anchored Composer Area */}
-        <div className="pt-2 shrink-0 bg-gradient-to-t from-[#fbfbfa] via-[#fbfbfa]/95 to-transparent dark:from-[#0f0f10] dark:via-[#0f0f10]/95">
-          <Composer onSend={sendMessage} onStop={stop} isStreaming={isStreaming} />
+        <div className="px-4 sm:px-8 pb-5 pt-3 shrink-0 bg-[#fbfbfa] dark:bg-[#0f0f10]">
+          <div className="max-w-3xl mx-auto">
+            <Composer onSend={sendMessage} onStop={stop} isStreaming={isStreaming} />
+          </div>
         </div>
       </div>
     </div>

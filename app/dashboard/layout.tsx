@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { auth } from "@/auth/auth";
 import { DashboardRail } from "@/components/dashboard/dashboard-rail";
+import { DashboardMain } from "@/components/dashboard/dashboard-main";
 
 export default async function DashboardLayout({
   children,
@@ -47,9 +48,7 @@ function DashboardShell({
   return (
     <>
       {user && <DashboardRail user={user} />}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-8 lg:px-12 py-8 sm:py-12">
-        {children}
-      </main>
+      <DashboardMain>{children}</DashboardMain>
     </>
   );
 }
