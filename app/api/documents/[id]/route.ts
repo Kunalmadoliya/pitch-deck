@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { createStorage } from "@/modules/indexing/storage/create-storage";
 import { createPineconeIndex } from "@/modules/indexing/vector-store/pinecone-client";
 import { deleteDocumentVectors } from "@/modules/indexing/vector-store/delete-document-vectors";
+import { evictPagePreviews } from "@/modules/indexing/preview/render-page-preview";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -49,5 +50,6 @@ export async function DELETE(request: Request, context: RouteContext): Promise<R
     return Response.json({ error: "Unable to delete stored file" }, { status: 502 });
   }
   await prisma.document.delete({ where: { id } });
+  evictPagePreviews(id);
   return new Response(null, { status: 204 });
 }

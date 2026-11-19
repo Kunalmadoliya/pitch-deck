@@ -3,6 +3,7 @@
 import React from "react";
 import { FileText } from "lucide-react";
 import type { Citation } from "@/lib/api/chat-types";
+import { PagePreviewTrigger } from "./page-preview";
 
 interface SourcesListProps {
   citations: Citation[];
@@ -18,15 +19,16 @@ export function SourcesList({ citations }: SourcesListProps) {
           Sources referenced ({citations.length})
         </span>
         <span className="text-[11px] text-stone-400 hidden sm:inline">
-          Click citation number to highlight
+          Hover a source to see the page
         </span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {citations.map((c) => (
+          <PagePreviewTrigger key={`${c.n}-${c.documentId}-${c.pageNumber}`} citation={c} as="div">
           <div
-            key={`${c.n}-${c.documentId}-${c.pageNumber}`}
             id={`source-item-${c.n}`}
+            tabIndex={0}
             className="group p-2.5 rounded-2xl border border-stone-200/80 dark:border-stone-800 bg-white/70 dark:bg-stone-900/50 hover:border-blue-300 dark:hover:border-blue-800 transition-all duration-200 shadow-2xs space-y-1.5"
           >
             <div className="flex items-center justify-between gap-2">
@@ -50,6 +52,7 @@ export function SourcesList({ citations }: SourcesListProps) {
               </div>
             </div>
           </div>
+          </PagePreviewTrigger>
         ))}
       </div>
     </div>

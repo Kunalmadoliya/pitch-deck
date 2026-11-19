@@ -6,8 +6,8 @@ export interface OpenPdf {
   pageCount: number;
   /** Text from the PDF's own text layer (empty for scanned pages). */
   readText(pageNumber: number): Promise<string>;
-  /** Draw the page as a PNG image, for OCR. */
-  renderImage(pageNumber: number): Promise<Buffer>;
+  /** Draw the page as an image. Defaults to a sharp PNG for OCR; previews ask for a smaller JPEG. */
+  renderImage(pageNumber: number, options?: { scale?: number; format?: "png" | "jpeg"; quality?: number }): Promise<Buffer>;
   close(): Promise<void>;
 }
 
@@ -33,10 +33,10 @@ export async function openPdf(data: Buffer): Promise<OpenPdf> {
       }
     },
 
-    async renderImage(pageNumber) {
+    async renderImage(pageNumber, options = {}) {
       const page = await document.getPage(pageNumber);
       try {
-        const viewport = page.getViewport({ scale: PDF_RENDER_SCALE });
+        const viewport = page.getViewport({ scale: options.scale ?? PDF_RENDER_SCALE });
         const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
         await page.render({
           canvasContext: canvas.getContext("2d") as never,
@@ -44,6 +44,7 @@ export async function openPdf(data: Buffer): Promise<OpenPdf> {
           viewport,
         }).promise;
         // Async encode runs off the main thread, so other pages keep moving meanwhile.
+        if (options.format === "jpeg") return await canvas.encode("jpeg", options.quality ?? 80);
         return await canvas.encode("png");
       } finally {
         page.cleanup();
