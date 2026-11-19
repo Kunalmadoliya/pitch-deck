@@ -1,8 +1,7 @@
 import React from "react";
 import Link from "next/link";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth/auth";
+import { getServerSession } from "@/auth/session";
 import { LoginForm } from "./login-form";
 import { LoginBackdrop } from "@/components/login/login-backdrop";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -10,7 +9,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 export const instant = false;
 
 export default async function LoginPage() {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getServerSession();
   if (session) {
     redirect("/dashboard");
   }

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowDown, Menu, X, ShieldCheck } from "lucide-react";
 import { useConversation } from "@/hooks/use-conversation";
 import { useChatStream } from "@/hooks/use-chat-stream";
@@ -17,6 +18,7 @@ interface ChatViewProps {
 }
 
 export function ChatView({ conversationId }: ChatViewProps) {
+  const router = useRouter();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const { data: conversationData, isLoading: isLoadingInitial } = useConversation(conversationId);
 
@@ -34,7 +36,9 @@ export function ChatView({ conversationId }: ChatViewProps) {
     conversationId,
     initialMessages: conversationData?.messages,
     isInitialLoading: isLoadingInitial,
-    onNewConversation: (id) => window.history.replaceState(null, "", `/dashboard/rag/chat/${id}`),
+    // A real navigation (not just changing the address bar) so the page knows which chat it is on.
+    // The chat is already in the query cache, so the new page shows instantly with no loading flash.
+    onNewConversation: (id) => router.replace(`/dashboard/rag/chat/${id}`, { scroll: false }),
   });
 
   const { containerRef, showJumpToLatest, scrollToBottom, handleScroll } = useAutoScroll(isStreaming, streamingContent);

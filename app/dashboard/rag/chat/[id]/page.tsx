@@ -14,5 +14,6 @@ interface ChatDetailPageProps {
 
 export default async function ChatDetailPage({ params }: ChatDetailPageProps) {
   const { id } = await params;
-  return <ChatView conversationId={id} />;
+  // key: switching chats gives a fresh chat screen instead of reusing the old one's state.
+  return <ChatView key={id} conversationId={id} />;
 }

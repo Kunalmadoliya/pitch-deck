@@ -7,7 +7,8 @@ import { finalizeDocument } from "@/modules/indexing/pipeline/finalize-document"
 import { inspectDocument } from "@/modules/indexing/pipeline/inspect-document";
 import { processPageBatch } from "@/modules/indexing/pipeline/process-page-batch";
 import { splitPageBatches } from "@/modules/indexing/pipeline/split-page-batches";
-import { logIndexingEvent, withIndexingLogging } from "@/modules/indexing/logger";
+import { logIndexingEvent, logIndexingTiming, withIndexingLogging } from "@/modules/indexing/logger";
+import { evictCachedFile } from "@/modules/indexing/storage/read-file-cached";
 import { prisma } from "@/lib/prisma";
 import { inngest } from "../client";
 import { NonRetriableError } from "inngest";
@@ -52,6 +53,7 @@ export const indexDocument = inngest.createFunction(
         );
         return;
       }
+      if (document) evictCachedFile(document.storageFileId);
       await step.run("mark-failed", () =>
         withIndexingLogging(documentId, "mark-failed", () => repo.fail(documentId, sanitizeErrorMessage(error))),
       );
@@ -98,7 +100,17 @@ export const indexDocument = inngest.createFunction(
     }
 
     await step.run("finalize", () =>
-      withIndexingLogging(document.id, "finalize", () => finalizeDocument(repo, document.id)),
+      withIndexingLogging(document.id, "finalize", async () => {
+        await finalizeDocument(repo, document.id);
+        evictCachedFile(document.storageFileId);
+        const totalMs = Date.now() - new Date(document.createdAt).getTime();
+        logIndexingTiming("document", {
+          documentId: document.id,
+          pages: inspection.pageCount,
+          totalMs,
+          msPerPage: Math.round(totalMs / Math.max(1, inspection.pageCount)),
+        });
+      }),
     );
     return { documentId: document.id, status: IndexingStage.DONE };
   },

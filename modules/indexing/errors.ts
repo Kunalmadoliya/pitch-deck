@@ -17,12 +17,6 @@ export class OcrError extends IndexingError {
   }
 }
 
-export class EmbeddingError extends IndexingError {
-  constructor(message = "Embedding generation failed", options?: ErrorOptions) {
-    super(message, "EMBEDDING_FAILED", options);
-  }
-}
-
 export class InvalidUploadError extends IndexingError {
   constructor(message = "InvalidUploadError: upload metadata mismatch") {
     super(message, "INVALID_UPLOAD");

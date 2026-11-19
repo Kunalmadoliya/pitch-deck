@@ -1,8 +1,7 @@
 import React from "react";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { auth } from "@/auth/auth";
+import { getServerSession } from "@/auth/session";
 import { DashboardRail } from "@/components/dashboard/dashboard-rail";
 import { DashboardMain } from "@/components/dashboard/dashboard-main";
 
@@ -25,7 +24,7 @@ async function AuthenticatedDashboard({
 }: {
   userChildren: React.ReactNode;
 }) {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getServerSession();
 
   if (!session) {
     if (process.env.NODE_ENV === "development") {

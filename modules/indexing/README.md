@@ -8,17 +8,19 @@ GET /api/upload-auth
   -> POST /api/documents
   -> document/uploaded
   -> inspect
-  -> process-batch-N
-       extract text layer or OCR
-       chunk per page
-       embed
-       upsert Pinecone vectors
-       persist page progress
+  -> process-batch-N            (file is downloaded once and cached; PDF opened once per batch)
+       for each page, several at the same time:
+         read text layer, or OCR it with the shared Tesseract pool
+         -> chunk
+         -> upsert to Pinecone (Pinecone embeds `chunk_text` itself)
+         -> save page + progress   (page is searchable right away)
   -> finalize
 ```
 
+Timing logs (`timing:page`, `timing:batch`, `timing:document`) show where the time goes.
+
 `modules/indexing` contains the ImageKit storage, extraction, OCR, chunking,
-embedding, vector-store, repository, and pipeline adapters used by the Inngest
+vector-store, repository, and pipeline adapters used by the Inngest
 function. The registration route performs only authentication, validation,
 database coordination, and event dispatch.
 

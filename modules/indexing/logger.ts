@@ -5,6 +5,14 @@ export function logIndexingEvent(
   console.info(JSON.stringify({ event, ...details }));
 }
 
+/** Speed numbers for one page or one batch, so you can see where the time goes. */
+export function logIndexingTiming(
+  event: "page" | "batch" | "document",
+  details: { documentId: string } & Record<string, string | number | undefined>,
+): void {
+  console.info(JSON.stringify({ event: `timing:${event}`, ...details }));
+}
+
 export async function withIndexingLogging<T>(
   documentId: string,
   stage: string,

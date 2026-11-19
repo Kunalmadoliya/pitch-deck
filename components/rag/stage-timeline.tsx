@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useDocument } from "@/hooks/use-document";
-import { IndexingStage } from "@/lib/api/documents";
+import { IndexingStage, formatIndexingDuration } from "@/lib/api/documents";
 
 interface StageTimelineProps {
   documentId: string;
@@ -12,16 +12,17 @@ interface StageTimelineProps {
 const STAGES: { key: IndexingStage; label: string; desc: string }[] = [
   { key: "QUEUED", label: "Queued", desc: "Awaiting background worker" },
   { key: "INSPECTING", label: "Inspecting", desc: "Validating pages and layout" },
-  { key: "EXTRACTING", label: "Reading pages", desc: "Extracting text layer and running OCR" },
-  { key: "CHUNKING", label: "Segmenting", desc: "Dividing clauses and preserving citations" },
-  { key: "EMBEDDING", label: "Understanding", desc: "Generating 1536-dim semantic vectors" },
-  { key: "UPSERTING", label: "Indexing", desc: "Saving vectors to isolated tenant namespace" },
+  { key: "EXTRACTING", label: "Reading & indexing pages", desc: "Each page is read (OCR for scans), split into clauses and made searchable right away" },
   { key: "DONE", label: "Ready", desc: "Indexed and ready for RAG queries" },
 ];
 
 export function StageTimeline({ documentId, initialStage }: StageTimelineProps) {
   const { data: document } = useDocument(documentId);
-  const currentStage = document?.stage || initialStage;
+  const rawStage = document?.stage || initialStage;
+  // Older documents may still report the stages from the previous step-by-step pipeline.
+  const currentStage: IndexingStage =
+    rawStage === "CHUNKING" || rawStage === "EMBEDDING" || rawStage === "UPSERTING" ? "EXTRACTING" : rawStage;
+  const duration = document ? formatIndexingDuration(document) : null;
   const isFailed = document?.status === "FAILED";
 
   const stageOrder = STAGES.map((s) => s.key);
@@ -34,6 +35,7 @@ export function StageTimeline({ documentId, initialStage }: StageTimelineProps) 
         {document?.pageCount && (
           <span>
             {document.pagesProcessed} of {document.pageCount} pages processed ({document.chunkCount} clauses)
+            {duration && <> · {duration}</>}
           </span>
         )}
       </div>

@@ -79,8 +79,14 @@ UPLOAD_DIR="uploads"
 # Tesseract OCR language code (default: eng)
 OCR_LANG="eng"
 
-# Number of PDF pages processed per Inngest background step (default: 3)
-PAGE_BATCH_SIZE=3
+# Number of PDF pages processed per Inngest background step (default: 10)
+PAGE_BATCH_SIZE=10
+
+# Tesseract workers kept alive and reused for OCR (default: CPU cores - 1, max 4)
+OCR_WORKERS=
+
+# Scale used to draw scanned PDF pages for OCR (default: 2; lower is faster but may miss tiny text)
+PDF_RENDER_SCALE=2
 
 # Character length threshold below which a PDF page triggers OCR (default: 50)
 OCR_TEXT_THRESHOLD=50
@@ -116,7 +122,9 @@ CHUNK_OVERLAP=150
 | `IMAGEKIT_ID` | No | — | ImageKit account identifier. |
 | `UPLOAD_DIR` | No | `uploads` | Local folder where uploaded files are saved before background processing. |
 | `OCR_LANG` | No | `eng` | Tesseract language training model to load for OCR recognition. |
-| `PAGE_BATCH_SIZE` | No | `3` | Pages grouped into each Inngest step (prevents serverless function timeouts). |
+| `PAGE_BATCH_SIZE` | No | `10` | Pages grouped into each Inngest step (prevents serverless function timeouts). Pages inside a step run in parallel. |
+| `OCR_WORKERS` | No | CPU cores - 1 (1–4) | Tesseract workers started once and reused for every OCR page. |
+| `PDF_RENDER_SCALE` | No | `2` | Render scale for scanned PDF pages before OCR. Lower is faster but less accurate on small text. |
 | `OCR_TEXT_THRESHOLD` | No | `50` | If extracted text layer contains fewer than this many characters, page is treated as scanned and processed with OCR. |
 | `CHUNK_SIZE` | No | `1000` | Target chunk size for LangChain text splitter. |
 | `CHUNK_OVERLAP` | No | `150` | Character overlap between consecutive chunks to maintain semantic context. |

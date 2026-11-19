@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { DocumentItem, formatBytes, stageLabel } from "@/lib/api/documents";
+import { DocumentItem, formatBytes, formatIndexingDuration, stageLabel } from "@/lib/api/documents";
 import { StatusPill } from "./status-pill";
 import { StageTimeline } from "./stage-timeline";
 import { useDeleteDocument } from "@/hooks/use-delete-document";
@@ -25,6 +25,7 @@ export function DocumentRow({ document: doc }: DocumentRowProps) {
     : doc.status === "INDEXED" ? 100 : 15;
 
   const uploadedAgo = formatDistanceToNow(new Date(doc.createdAt), { addSuffix: true });
+  const duration = formatIndexingDuration(doc);
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -66,6 +67,12 @@ export function DocumentRow({ document: doc }: DocumentRowProps) {
                 <>
                   <span>•</span>
                   <span>{doc.pageCount} pages, {doc.chunkCount} clauses</span>
+                </>
+              )}
+              {duration && (
+                <>
+                  <span>•</span>
+                  <span>{duration}</span>
                 </>
               )}
             </div>

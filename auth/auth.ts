@@ -9,6 +9,14 @@ export const auth = betterAuth({
   }),
   baseURL: process.env.BETTER_AUTH_URL,
   secret: process.env.BETTER_AUTH_SECRET,
+  session: {
+    // Keep a signed copy of the session in a cookie for 5 minutes, so most session
+    // checks (pages, API routes, document polling) skip the database round trip.
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,
+    },
+  },
   plugins: [
     dash({
       apiKey: process.env.BETTER_AUTH_API_KEY,

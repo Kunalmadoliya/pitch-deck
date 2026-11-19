@@ -86,18 +86,26 @@ export function stageLabel(stage: IndexingStage): string {
     case "INSPECTING":
       return "Inspecting document";
     case "EXTRACTING":
-      return "Reading pages";
     case "CHUNKING":
-      return "Segmenting clauses";
     case "EMBEDDING":
-      return "Understanding content";
     case "UPSERTING":
-      return "Saving to vector index";
+      return "Reading & indexing pages";
     case "DONE":
       return "Ready for queries";
     default:
       return stage;
   }
+}
+
+/** "Indexed in 14s · 1.2s/page", from upload time to ready time. Null until the document is ready. */
+export function formatIndexingDuration(doc: { createdAt: string; indexedAt: string | null; pageCount: number | null }): string | null {
+  if (!doc.indexedAt) return null;
+  const ms = new Date(doc.indexedAt).getTime() - new Date(doc.createdAt).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const seconds = ms / 1000;
+  const total = seconds < 60 ? `${seconds.toFixed(seconds < 10 ? 1 : 0)}s` : `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+  const perPage = doc.pageCount && doc.pageCount > 0 ? ` · ${(seconds / doc.pageCount).toFixed(1)}s/page` : "";
+  return `Indexed in ${total}${perPage}`;
 }
 
 export function formatBytes(bytes: number): string {

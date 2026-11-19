@@ -1,7 +1,6 @@
 import React from "react";
-import { headers } from "next/headers";
 import { Suspense } from "react";
-import { auth } from "@/auth/auth";
+import { getServerSession } from "@/auth/session";
 import { DashboardHomeView } from "@/components/dashboard/dashboard-home-view";
 
 export default function DashboardPage() {
@@ -13,7 +12,7 @@ export default function DashboardPage() {
 }
 
 async function DashboardContent() {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getServerSession();
 
   return <DashboardHomeView userName={session?.user.name} />;
 }
