@@ -1,6 +1,12 @@
 import { createCanvas } from "@napi-rs/canvas";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+// pdf.js normally loads its worker file by a path it builds at runtime, which Vercel's file
+// tracing can't see, so the file is left out of the deploy ("Setting up fake worker failed").
+// Importing it here makes it a normal dependency, and handing it to pdf.js means no runtime lookup.
+import * as pdfjsWorker from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import { PDF_RENDER_SCALE } from "../config";
+
+(globalThis as { pdfjsWorker?: unknown }).pdfjsWorker ??= pdfjsWorker;
 
 export interface OpenPdf {
   pageCount: number;
