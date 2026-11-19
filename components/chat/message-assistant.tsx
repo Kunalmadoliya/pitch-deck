@@ -4,8 +4,8 @@ import React, { useState } from "react";
 import { Copy, Check, RotateCw, AlertCircle } from "lucide-react";
 import type { Citation, QueryStage } from "@/lib/api/chat-types";
 import { errorMessage } from "@/lib/api/chat-types";
-import { parseCitationSegments, stripCitations } from "@/lib/citation-parser";
-import { CitationPill } from "./citation-pill";
+import { stripCitations } from "@/lib/citation-parser";
+import { MarkdownAnswer } from "./markdown-answer";
 import { SourcesList } from "./sources-list";
 import { StageStatus } from "./stage-status";
 
@@ -43,26 +43,11 @@ export function MessageAssistant({
     }
   };
 
-  const segments = parseCitationSegments(content, citations);
-
   return (
     <div className="w-full space-y-3 group/msg">
       {/* Open text directly on page background */}
-      <div className="text-sm sm:text-base leading-relaxed text-stone-900 dark:text-stone-100 whitespace-pre-wrap break-words">
-        {segments.map((segment, idx) => {
-          if (segment.type === "citation" && segment.citation) {
-            return (
-              <CitationPill
-                key={`cit-${idx}-${segment.citation.n}`}
-                citation={segment.citation}
-              />
-            );
-          }
-          if (segment.type === "text") {
-            return <span key={`txt-${idx}`}>{segment.value}</span>;
-          }
-          return null;
-        })}
+      <div className="text-sm sm:text-base leading-relaxed text-stone-900 dark:text-stone-100 break-words">
+        <MarkdownAnswer content={content} citations={citations} />
       </div>
 
       {/* Streaming stage indicator */}
