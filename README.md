@@ -8,15 +8,16 @@
 ## Table of Contents
 
 1. [Executive Summary](#executive-summary)
-2. [End-to-End System Architecture](#end-to-end-system-architecture)
-3. [Ingestion & Indexing Pipeline (Asynchronous)](#ingestion--indexing-pipeline-asynchronous)
-4. [Query & Grounded Retrieval Engine (RAG)](#query--grounded-retrieval-engine-rag)
-5. [Data Models & Persistence Strategy](#data-models--persistence-strategy)
-6. [Multi-Tenant Security & Privacy Model](#multi-tenant-security--privacy-model)
-7. [Frontend Architecture & Design Philosophy](#frontend-architecture--design-philosophy)
-8. [Technology Stack](#technology-stack)
-9. [Environment Configuration Reference](#environment-configuration-reference)
-10. [Local Development & Operations Runbook](#local-development--operations-runbook)
+2. [How It Works (The Simple Version)](#how-it-works-the-simple-version)
+3. [End-to-End System Architecture](#end-to-end-system-architecture)
+4. [Ingestion & Indexing Pipeline (Asynchronous)](#ingestion--indexing-pipeline-asynchronous)
+5. [Query & Grounded Retrieval Engine (RAG)](#query--grounded-retrieval-engine-rag)
+6. [Data Models & Persistence Strategy](#data-models--persistence-strategy)
+7. [Multi-Tenant Security & Privacy Model](#multi-tenant-security--privacy-model)
+8. [Frontend Architecture & Design Philosophy](#frontend-architecture--design-philosophy)
+9. [Technology Stack](#technology-stack)
+10. [Environment Configuration Reference](#environment-configuration-reference)
+11. [Local Development & Operations Runbook](#local-development--operations-runbook)
 
 ---
 
@@ -28,6 +29,178 @@ Enterprise policy documentation is historically difficult to query: agreements a
 - **Asynchronous Ingestion Engine**: Decouples slow operations (OCR, PDF rendering, chunking, embedding generation, Pinecone upserts) into isolated, idempotent background steps powered by **Inngest**. API routes remain sub-50ms.
 - **Grounded Query Engine**: Implements an advanced 9-stage Retrieval-Augmented Generation (RAG) pipeline incorporating prompt injection guardrails, multi-angle query optimization (HyDE, Step-Back, Sub-Queries), Reciprocal Rank Fusion (RRF), Cross-Encoder Reranking, strict clause-level citation enforcement, and output hallucination verification.
 - **Family.co Aesthetic**: Designed with spacious typography, hairline dividers, soft rounded shapes, and zero "card soup", delivering a modern, calm corporate tool.
+
+---
+
+## How It Works (The Simple Version)
+
+No code talk here. Just boxes and arrows so anyone can get it in 2 minutes.
+
+### The big picture
+
+```
+   +---------+        +------------------+        +-------------+
+   |   YOU   | -----> |  Log in (Google  | -----> |  Dashboard  |
+   |         |        |   or GitHub)     |        |             |
+   +---------+        +------------------+        +------+------+
+                                                         |
+                               +-------------------------+-------------------------+
+                               |                                                   |
+                               v                                                   v
+                    +---------------------+                             +---------------------+
+                    |  1. Upload a policy |                             |  2. Ask a question  |
+                    |     (PDF / image)   |                             |   about your docs   |
+                    +---------------------+                             +---------------------+
+```
+
+That's it. Two things: **put docs in**, and **ask questions out**.
+
+---
+
+### Flow 1: Uploading a document
+
+```
+   You drop a file
+          |
+          v
+   +-------------------------------+
+   | Is it OK? (PDF or image,      |----- no ---->  "Nope, can't take this file"
+   | not too big, your own folder) |
+   +-------------------------------+
+          | yes
+          v
+   File gets saved safely in private storage
+          |
+          v
+   App says "Got it! Working on it..."   <-- you don't have to wait here
+          |
+          v
+   ~~~~~~~~~~~~ the rest happens in the background ~~~~~~~~~~~~
+          |
+          v
+   Count the pages, then take them 3 at a time
+          |
+          v
+   +---------------------------+
+   | Can we read the text on   |
+   | this page directly?       |
+   +---------------------------+
+       |                 |
+      yes               no (it's a scan / photo)
+       |                 |
+       v                 v
+   Grab the text     Read it like a human would (OCR)
+       |                 |
+       +--------+--------+
+                |
+                v
+   Cut the text into small bite-size pieces
+                |
+                v
+   Turn each piece into "meaning numbers"
+   (so the app can find stuff by meaning, not just exact words)
+                |
+                v
+   Store them in the search memory, tagged with YOUR name only
+                |
+                v
+   More pages left? ---- yes ---> go back and do the next 3
+                |
+               no
+                v
+   Status becomes  DONE  -- ready to ask questions!
+
+   (If something breaks, it tries again up to 3 times.
+    If it still fails, the doc is marked FAILED with a reason.)
+```
+
+You can watch the status move along on screen:
+`QUEUED -> INSPECTING -> EXTRACTING -> CHUNKING -> EMBEDDING -> UPSERTING -> DONE`
+
+---
+
+### Flow 2: Asking a question
+
+```
+   You type a question
+          |
+          v
+   +------------------------+
+   | Too many questions too |---- yes ---->  "Slow down a bit"
+   | fast?                  |
+   +------------------------+
+          | no
+          v
+   +------------------------+
+   | Is it a trick / sneaky |---- yes ---->  "I can't help with that"
+   | message? (safety check)|
+   +------------------------+
+          | no
+          v
+   Look at your earlier chat, so follow-up questions make sense
+          |
+          v
+   Make the question better:
+     - clean it up
+     - ask a bigger "step back" version
+     - split it into smaller questions
+     - guess what a good answer might look like
+          |
+          v
+   +-----------------------------------------------+
+   | What kind of question is it?                  |
+   +-----------------------------------------------+
+      |                     |                    |
+   about what's          about your files     both
+   INSIDE the docs       ("how many files?")
+      |                     |                    |
+      v                     v                    v
+   Search your doc      Check your file list   Do both
+   pieces (only YOURS)
+      |                     |                    |
+      +----------+----------+--------------------+
+                 |
+                 v
+   Mix all the results together and keep the best ones on top
+                 |
+                 v
+   Found nothing? ---- yes ---->  "I couldn't find this in your documents"
+                 |
+                 no
+                 v
+   AI writes the answer using ONLY those pieces
+   (words show up live, one by one, while it types)
+                 |
+                 v
+   +---------------------------------------------+
+   | Final check: does every claim point to a    |
+   | real source like [1], [2]?                  |
+   +---------------------------------------------+
+        |                         |
+       yes                        no
+        |                         |
+        v                         v
+   Show answer with          Swap it for "I couldn't verify
+   clickable sources         this answer against your documents"
+   (file name + page)
+        |
+        v
+   Save the chat so you can come back to it later
+```
+
+---
+
+### The golden rules
+
+```
+   +----------------------------------------------------------+
+   |  1. You only ever see YOUR docs. Nobody else's.          |
+   |  2. No made-up answers. No source = no answer.           |
+   |  3. Every answer tells you which file and which page.    |
+   |  4. Slow stuff runs in the background, so the app stays  |
+   |     fast.                                                |
+   +----------------------------------------------------------+
+```
 
 ---
 
