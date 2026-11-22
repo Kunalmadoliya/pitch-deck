@@ -8,7 +8,7 @@ export const SlideSchema = z.object({
   title: z.string().min(1).max(100),
   content: z.string().min(1).max(1000),
   // Required: the Slide table stores imagePrompt as a non-null column.
-  imagePrompt: z.string().min(1).max(1000),
+  imagePrompt: z.string().min(1).max(4000),
 });
 
 export const PitchDeckSchema = z.object({
@@ -27,14 +27,33 @@ export type PitchDeck = z.infer<typeof PitchDeckSchema>;
 // apply the limits afterwards with toPitchDeck().
 // ---------------------------------------------------------------------------
 
+/** Kinds of visuals a slide can ask for. Diagrams and flowcharts suit teaching and "how it works" slides. */
+export const VISUAL_TYPES = [
+  "diagram",
+  "flowchart",
+  "timeline",
+  "chart",
+  "infographic",
+  "illustration",
+  "product_mockup",
+  "photo",
+] as const;
+export type VisualType = (typeof VISUAL_TYPES)[number];
+
 export const PitchDeckOutputSchema = z.object({
   title: z.string(),
   description: z.string(),
+  // True when the idea is about teaching, learning, training or a course.
+  isEducational: z.boolean(),
   slides: z.array(
     z.object({
       title: z.string(),
       content: z.string(),
+      visualType: z.enum(VISUAL_TYPES),
+      // What to draw: subject, layout, and how the parts connect.
       imagePrompt: z.string(),
+      // Exact short labels to print in the image (empty = no text at all).
+      imageText: z.array(z.string()),
     }),
   ),
 });
@@ -43,16 +62,24 @@ export type PitchDeckOutput = z.infer<typeof PitchDeckOutputSchema>;
 
 const clip = (value: string, max: number) => value.trim().slice(0, max);
 
-/** Trims the AI's deck to the saved limits, then validates it (throws if still invalid). */
-export function toPitchDeck(output: PitchDeckOutput): PitchDeck {
+export type PitchDeckOutputSlide = PitchDeckOutput["slides"][number];
+
+/**
+ * Trims the AI's deck to the saved limits, then validates it (throws if still invalid).
+ * `buildImagePrompt` turns each slide's visual plan into the final prompt for the image model.
+ */
+export function toPitchDeck(
+  output: PitchDeckOutput,
+  buildImagePrompt: (slide: PitchDeckOutputSlide, index: number) => string,
+): PitchDeck {
   return PitchDeckSchema.parse({
     title: clip(output.title, 100),
     description: clip(output.description, 500),
     slides: output.slides
-      .map((slide) => ({
+      .map((slide, index) => ({
         title: clip(slide.title, 100),
         content: clip(slide.content, 1000),
-        imagePrompt: clip(slide.imagePrompt, 1000) || slide.title.trim(),
+        imagePrompt: clip(buildImagePrompt(slide, index), 4000) || slide.title.trim(),
       }))
       .filter((slide) => slide.title && slide.content)
       .slice(0, 20),

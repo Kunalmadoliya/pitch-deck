@@ -8,7 +8,7 @@ const CONFIG: Record<DeckStatus, { label: string; dot: string; tone: string }> =
     tone: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200/60 dark:border-amber-800/40",
   },
   GENERATING: {
-    label: "Writing slides",
+    label: "Generating",
     dot: "bg-blue-600 dark:bg-blue-400 animate-pulse",
     tone: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/60 dark:border-blue-800/40",
   },

@@ -69,13 +69,6 @@ export function MobileNav({ user, navLinks, onSignOut, signingOut }: MobileNavPr
             </Link>
           ))}
 
-          <div className="px-4 py-2 text-xs font-mono text-stone-400 flex items-center justify-between">
-            <span>AI Pitch Deck</span>
-            <span className="px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-[10px]">
-              Coming soon
-            </span>
-          </div>
-
           <div className="pt-3 border-t border-dotted border-stone-200 dark:border-stone-800 flex items-center justify-between">
             <span className="text-xs text-stone-500 truncate max-w-[180px]">{user.email}</span>
             <button

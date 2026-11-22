@@ -69,16 +69,20 @@ const QualityCheckSchema = z.object({
   reason: z.string().nullable(),
 });
 
-const QUALITY_CHECK_PROMPT = `You review pitch deck JSON for a beginner learning app.
+const QUALITY_CHECK_PROMPT = `You are a quality checker. You receive one generated startup pitch deck as JSON.
+The deck can be about ANY business, product or industry (for example a marketplace, a SaaS tool,
+a restaurant app, an education product, hardware, services). The topic itself is never a reason to reject.
 
-Return isValid: false if ANY of these are true:
-- Profanity, hate speech, or violent content
-- Placeholder text like "TBD", "lorem ipsum", "[insert here]", "coming soon"
-- Slides with empty or meaningless filler content
-- Content that is clearly not a business pitch deck
+Only check the deck's quality and safety. Return isValid: false ONLY if at least one of these is clearly true:
+- Profanity, hate speech, sexual content, or violent content
+- Placeholder text such as "TBD", "lorem ipsum", "[insert here]", "coming soon", "XYZ Company"
+- A slide whose title or content is empty, or is meaningless filler that says nothing about the idea
+- The JSON is not a pitch deck at all (for example a poem, a recipe, or a refusal message)
 
-Otherwise return isValid: true.
-If invalid, explain why in the reason field. If valid, set reason to null.`;
+Ignore the extra planning fields (isEducational, visualType, imagePrompt, imageText); they are instructions for drawing pictures.
+When in doubt, return isValid: true.
+
+If invalid, give a short, plain reason the user can act on. If valid, set reason to null.`;
 
 let qualityChecker: ReturnType<typeof buildQualityChecker> | undefined;
 

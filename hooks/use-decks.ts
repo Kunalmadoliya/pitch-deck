@@ -8,6 +8,7 @@ import {
   fetchDeck,
   fetchDecks,
   isDeckBusy,
+  isDeckWorking,
   type DeckDetail,
   type DeckSummary,
 } from "@/lib/api/decks";
@@ -24,14 +25,14 @@ export function useDecks() {
   });
 }
 
-/** One deck with slides. Polls until it is COMPLETE or FAILED. */
+/** One deck with slides. Polls until the text and every slide image are done. */
 export function useDeck(id: string) {
   return useQuery<DeckDetail, Error>({
     queryKey: deckKeys.detail(id),
     queryFn: () => fetchDeck(id),
     refetchInterval: (query) => {
       const deck = query.state.data;
-      return !deck || isDeckBusy(deck.status) ? POLL_MS : false;
+      return !deck || isDeckWorking(deck) ? POLL_MS : false;
     },
   });
 }

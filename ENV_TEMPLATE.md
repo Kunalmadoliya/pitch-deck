@@ -61,6 +61,11 @@ PINECONE_INDEX="your-pinecone-index-name"
 # OpenAI API key for text-embedding-3-small embeddings
 OPENAI_API_KEY="sk-proj-..."
 
+# Pitch deck slide images (optional, blank = default)
+# DECK_IMAGE_MODEL="gpt-image-2"
+# DECK_IMAGE_FALLBACK_MODEL="gpt-image-1.5"   # blank turns off the retry on a second model
+# DECK_IMAGE_QUALITY="low"                    # low (cheapest, fastest) | medium | high
+
 # ==========================================
 # 6. IMAGEKIT (Media & Cloud File Storage)
 # ==========================================
@@ -116,6 +121,9 @@ CHUNK_OVERLAP=150
 | `PINECONE_API_KEY` | **Yes** (for indexing) | — | API key to authenticate with Pinecone serverless vector database. |
 | `PINECONE_INDEX` | **Yes** (for indexing) | — | Name of the Pinecone index configured for 1536-dimension vectors. |
 | `OPENAI_API_KEY` | **Yes** (for indexing) | — | API key used by `modules/indexing/embeddings/embedder.ts` for `text-embedding-3-small`. |
+| `DECK_IMAGE_MODEL` | No | `gpt-image-2` | Image model for pitch deck slides (`modules/pitch-deck/image-generator.ts`). |
+| `DECK_IMAGE_FALLBACK_MODEL` | No | `gpt-image-1.5` | Tried once when the main model fails for a temporary reason. Empty disables it. |
+| `DECK_IMAGE_QUALITY` | No | `low` | `low` (about $0.005 per image, fastest), `medium` or `high`. Higher is slower, costs more and spells labels better. |
 | `IMAGEKIT_PUBLIC_KEY` | **Yes** (for ImageKit) | — | Public key for client-side authentication and ImageKit URL generation. |
 | `IMAGEKIT_PRIVATE_KEY` | **Yes** (for ImageKit) | — | Private key for server-side upload and deletion. |
 | `IMAGEKIT_URL_ENDPOINT` | **Yes** (for ImageKit) | — | Base CDN endpoint URL (e.g. `https://ik.imagekit.io/<id>`). |

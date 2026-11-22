@@ -5,11 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Copy, Check, Maximize2, Trash2, ImageIcon } from "lucide-react";
 import { useDeck, useDeleteDeck } from "@/hooks/use-decks";
-import { isDeckBusy, type DeckDetail } from "@/lib/api/decks";
+import { isDeckBusy, type DeckDetail, type DeckSlide } from "@/lib/api/decks";
 import { DeckStatusPill } from "./deck-status-pill";
-import { SlideCard, slideBullets } from "./slide-card";
+import { SlideCard, imageHasLabels, slideBullets } from "./slide-card";
 
-const STEPS = ["Checking your idea", "Writing the slides", "Quality check", "Saving the deck"];
 
 function deckAsText(deck: DeckDetail): string {
   const lines = [deck.title ?? "Pitch deck", ""];
@@ -71,7 +70,7 @@ export function DeckViewer({ deckId }: { deckId: string }) {
             </button>
           </header>
 
-          {isDeckBusy(deck.status) && <GeneratingState status={deck.status} />}
+          {isDeckBusy(deck.status) && <GeneratingState deck={deck} />}
 
           {deck.status === "FAILED" && (
             <div className="rounded-3xl border border-red-200 dark:border-red-900/60 bg-red-50/60 dark:bg-red-950/30 p-6 space-y-3">
@@ -95,28 +94,38 @@ export function DeckViewer({ deckId }: { deckId: string }) {
   );
 }
 
-function GeneratingState({ status }: { status: DeckDetail["status"] }) {
-  const [step, setStep] = useState(0);
-  useEffect(() => {
-    if (status !== "GENERATING") return;
-    const timer = setInterval(() => setStep((s) => Math.min(s + 1, STEPS.length - 1)), 6000);
-    return () => clearInterval(timer);
-  }, [status]);
-  const active = status === "PENDING" ? -1 : step;
+function GeneratingState({ deck }: { deck: DeckDetail }) {
+  const { slidesWritten, imagesDone } = deck.progress ?? { slidesWritten: 0, imagesDone: 0 };
+  // Real stage from the background job: queue → writing → drawing → finishing.
+  const active =
+    deck.status === "PENDING" ? -1 : slidesWritten === 0 ? 0 : imagesDone < slidesWritten ? 1 : 2;
+  const percent = slidesWritten > 0 ? Math.round((imagesDone / slidesWritten) * 100) : 0;
+  const steps = [
+    "Writing & checking slides",
+    slidesWritten > 0 ? `Drawing images ${imagesDone} / ${slidesWritten}` : "Drawing images",
+    "Finishing up",
+  ];
 
   return (
     <div className="aspect-video w-full rounded-3xl border border-dashed border-stone-300 dark:border-stone-800 bg-white/60 dark:bg-stone-900/40 flex flex-col items-center justify-center gap-6 p-6">
       <div className="size-10 rounded-full border-2 border-blue-600/20 border-t-blue-600 animate-spin" />
       <div className="text-center space-y-1">
         <p className="text-sm font-semibold text-stone-900 dark:text-stone-100">
-          {status === "PENDING" ? "Waiting in the queue…" : "Building your deck…"}
+          {deck.status === "PENDING" ? "Waiting in the queue…" : "Building your deck…"}
         </p>
-        <p className="text-xs text-stone-500 dark:text-stone-400">This usually takes under a minute. You can leave this page.</p>
+        <p className="text-xs text-stone-500 dark:text-stone-400">
+          Your slides open here once the text and every image are ready. You can leave this page.
+        </p>
       </div>
+      {active === 1 && (
+        <div className="w-full max-w-xs h-1.5 rounded-full bg-stone-200 dark:bg-stone-800 overflow-hidden">
+          <div className="h-full bg-blue-600 transition-all duration-500" style={{ width: `${percent}%` }} />
+        </div>
+      )}
       <ol className="flex flex-wrap justify-center gap-2">
-        {STEPS.map((label, i) => (
+        {steps.map((label, i) => (
           <li
-            key={label}
+            key={i}
             className={`px-3 py-1 rounded-full text-[11px] font-mono transition-colors ${
               i < active
                 ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
@@ -169,8 +178,14 @@ function SlidePlayer({ deck }: { deck: DeckDetail }) {
 
   return (
     <div className="space-y-5">
-      <div ref={stageRef} className="relative group bg-[#fbfbfa] dark:bg-[#0f0f10] [&:fullscreen]:flex [&:fullscreen]:items-center [&:fullscreen]:p-8">
-        <SlideCard slide={slide} index={current} total={total} deckTitle={deckTitle} />
+      <div
+        ref={stageRef}
+        className="relative group bg-[#fbfbfa] dark:bg-[#0f0f10] [&:fullscreen]:flex [&:fullscreen]:items-center [&:fullscreen]:justify-center [&:fullscreen]:p-8"
+      >
+        {/* In fullscreen the slide is as big as fits BOTH the screen width and height, so it never gets cut off. */}
+        <div className="slide-frame w-full [:fullscreen_&]:w-[min(calc(100vw-4rem),calc((100vh-4rem)*16/9))]">
+          <SlideCard slide={slide} index={current} total={total} deckTitle={deckTitle} />
+        </div>
         <button
           type="button"
           onClick={() => go(-1)}
@@ -222,27 +237,65 @@ function SlidePlayer({ deck }: { deck: DeckDetail }) {
             onClick={() => setCurrent(i)}
             aria-label={`Go to slide ${i + 1}: ${s.title}`}
             aria-current={i === current}
-            className={`text-left rounded-xl border p-2 transition-all cursor-pointer ${
+            className={`text-left rounded-xl border overflow-hidden transition-all cursor-pointer ${
               i === current
                 ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/60 dark:bg-blue-500/10"
                 : "border-stone-200 dark:border-stone-800 hover:border-stone-400 dark:hover:border-stone-600 bg-white/70 dark:bg-stone-900/50"
             }`}
           >
-            <span className="block text-[10px] font-mono text-stone-400">{String(i + 1).padStart(2, "0")}</span>
-            <span className="block text-[11px] font-medium text-stone-800 dark:text-stone-200 truncate">{s.title}</span>
+            <div className="aspect-video w-full bg-stone-100 dark:bg-stone-800/70">
+              {s.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- remote ImageKit thumbnail
+                <img
+                  src={s.imageUrl}
+                  alt=""
+                  loading="lazy"
+                  className={`size-full ${imageHasLabels(s) ? "object-contain bg-white" : "object-cover"}`}
+                />
+              ) : s.imageStatus === "PENDING" ? (
+                <div className="size-full animate-pulse" />
+              ) : null}
+            </div>
+            <div className="p-2">
+              <span className="block text-[10px] font-mono text-stone-400">{String(i + 1).padStart(2, "0")}</span>
+              <span className="block text-[11px] font-medium text-stone-800 dark:text-stone-200 truncate">{s.title}</span>
+            </div>
           </button>
         ))}
       </div>
 
-      {slide.imagePrompt && (
-        <div className="flex gap-2.5 rounded-2xl bg-stone-100/60 dark:bg-stone-900/60 px-4 py-3">
-          <ImageIcon className="size-3.5 mt-0.5 text-stone-400 shrink-0" />
-          <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed">
-            <span className="font-medium text-stone-600 dark:text-stone-300">Visual idea: </span>
-            {slide.imagePrompt}
-          </p>
-        </div>
+      <ImageStatusNote deck={deck} slide={slide} />
+    </div>
+  );
+}
+
+const IMAGE_NOTES: Partial<Record<DeckSlide["imageStatus"], string>> = {
+  FAILED: "The image for this slide could not be made. The text is still complete.",
+  REFUSED: "The image model declined this slide's picture, so it is shown without one.",
+};
+
+function ImageStatusNote({ deck, slide }: { deck: DeckDetail; slide: DeckSlide }) {
+  const pending = deck.slides.filter((s) => s.imageStatus === "PENDING").length;
+  const note = IMAGE_NOTES[slide.imageStatus];
+
+  return (
+    <div className="space-y-2">
+      {pending > 0 && (
+        <p className="flex items-center gap-2 text-[11px] font-mono text-blue-600 dark:text-blue-400">
+          <span className="size-1.5 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse" />
+          Drawing {pending} image{pending === 1 ? "" : "s"} in the background. They appear here when ready.
+        </p>
       )}
+      {note && <p className="text-[11px] text-amber-700 dark:text-amber-400">{note}</p>}
+      <details className="group rounded-2xl bg-stone-100/60 dark:bg-stone-900/60 px-4 py-3">
+        <summary className="flex items-center gap-2 text-[11px] font-medium text-stone-600 dark:text-stone-300 cursor-pointer select-none">
+          <ImageIcon className="size-3.5 text-stone-400" />
+          Image prompt for this slide
+        </summary>
+        <p className="mt-2 text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed whitespace-pre-line">
+          {slide.imagePrompt}
+        </p>
+      </details>
     </div>
   );
 }

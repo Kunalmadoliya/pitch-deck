@@ -16,10 +16,21 @@ export interface DeckSlide {
   content: string;
   imagePrompt: string;
   imageUrl: string | null;
+  imageStatus: SlideImageStatus;
+}
+
+export type SlideImageStatus = "PENDING" | "COMPLETE" | "FAILED" | "REFUSED" | "SKIPPED";
+
+/** True while the deck or any of its slide images is still being made in the background. */
+export function isDeckWorking(deck: DeckDetail): boolean {
+  return isDeckBusy(deck.status) || (deck.status === "COMPLETE" && deck.slides.some((s) => s.imageStatus === "PENDING"));
 }
 
 export interface DeckDetail extends DeckSummary {
+  /** Empty until the deck is COMPLETE (text and every image finished). */
   slides: DeckSlide[];
+  /** Live progress while the deck is being made. */
+  progress: { slidesWritten: number; imagesDone: number };
 }
 
 export const MIN_IDEA_CHARS = 20;

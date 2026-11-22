@@ -37,11 +37,6 @@ export function LandingStatement() {
           </div>
         ))}
       </div>
-
-      {/* Inline note: AI Pitch Deck coming soon */}
-      <p className="mt-8 text-xs text-stone-400 dark:text-stone-500 font-sans">
-        AI Pitch Deck coming soon.
-      </p>
     </section>
   );
 }

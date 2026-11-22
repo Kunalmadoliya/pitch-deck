@@ -92,13 +92,6 @@ export function DashboardRail({ user }: DashboardRailProps) {
                 {link.label}
               </Link>
             ))}
-
-            <div className="flex items-center justify-between px-4 py-2.5 rounded-full text-sm text-stone-400 dark:text-stone-600 cursor-not-allowed select-none">
-              <span>AI Pitch Deck</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800/50 text-stone-400">
-                Soon
-              </span>
-            </div>
           </nav>
         </div>
 

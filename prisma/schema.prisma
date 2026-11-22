@@ -204,7 +204,18 @@ model Slide {
   content     String   @db.Text
   imagePrompt String   @db.Text
   imageUrl    String?
+  imageFileId String?
+  imageStatus SlideImageStatus @default(PENDING)
+  imageError  String?
   createdAt   DateTime @default(now())
 
   @@index([deckId])
+}
+
+enum SlideImageStatus {
+  PENDING
+  COMPLETE
+  FAILED
+  REFUSED
+  SKIPPED
 }
