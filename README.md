@@ -2,6 +2,7 @@
 
 > **Enterprise Company Policy Reader & Grounded RAG Intelligence Engine**  
 > Transform complex corporate handbooks, compliance manuals, HR policies, and vendor SLAs into provable, clause-cited answers with sub-second retrieval, automated OCR fallback, and multi-tenant isolation.
+> Plus an **AI Pitch Deck** builder that turns a one-paragraph idea into a 7-slide investor deck with AI-drawn diagrams and pictures.
 
 ---
 
@@ -12,12 +13,13 @@
 3. [End-to-End System Architecture](#end-to-end-system-architecture)
 4. [Ingestion & Indexing Pipeline (Asynchronous)](#ingestion--indexing-pipeline-asynchronous)
 5. [Query & Grounded Retrieval Engine (RAG)](#query--grounded-retrieval-engine-rag)
-6. [Data Models & Persistence Strategy](#data-models--persistence-strategy)
-7. [Multi-Tenant Security & Privacy Model](#multi-tenant-security--privacy-model)
-8. [Frontend Architecture & Design Philosophy](#frontend-architecture--design-philosophy)
-9. [Technology Stack](#technology-stack)
-10. [Environment Configuration Reference](#environment-configuration-reference)
-11. [Local Development & Operations Runbook](#local-development--operations-runbook)
+6. [AI Pitch Deck Generator](#ai-pitch-deck-generator)
+7. [Data Models & Persistence Strategy](#data-models--persistence-strategy)
+8. [Multi-Tenant Security & Privacy Model](#multi-tenant-security--privacy-model)
+9. [Frontend Architecture & Design Philosophy](#frontend-architecture--design-philosophy)
+10. [Technology Stack](#technology-stack)
+11. [Environment Configuration Reference](#environment-configuration-reference)
+12. [Local Development & Operations Runbook](#local-development--operations-runbook)
 
 ---
 
@@ -27,7 +29,8 @@ Enterprise policy documentation is historically difficult to query: agreements a
 
 **PolicyExtract** solves this with a purpose-built, dual-engine architecture:
 - **Asynchronous Ingestion Engine**: Decouples slow operations (OCR, PDF rendering, chunking, embedding generation, Pinecone upserts) into isolated, idempotent background steps powered by **Inngest**. API routes remain sub-50ms.
-- **Grounded Query Engine**: Implements an advanced 9-stage Retrieval-Augmented Generation (RAG) pipeline incorporating prompt injection guardrails, multi-angle query optimization (HyDE, Step-Back, Sub-Queries), Reciprocal Rank Fusion (RRF), Cross-Encoder Reranking, strict clause-level citation enforcement, and output hallucination verification.
+- **Grounded Query Engine**: Implements an advanced 9-stage Retrieval-Augmented Generation (RAG) pipeline incorporating prompt injection guardrails, intent routing (including a fast **chat** route for greetings and general questions), multi-angle query optimization (HyDE, Step-Back, Sub-Queries), Reciprocal Rank Fusion (RRF), Cross-Encoder Reranking, strict clause-level citation enforcement, and output hallucination verification.
+- **AI Pitch Deck Generator**: A LangChain agent with input and output guardrails writes a 7-slide deck plus a picture plan for every slide. An Inngest job then draws every slide image at once (OpenAI `gpt-image-2`), uploads it to ImageKit, and only hands the deck over when everything is ready.
 - **Family.co Aesthetic**: Designed with spacious typography, hairline dividers, soft rounded shapes, and zero "card soup", delivering a modern, calm corporate tool.
 
 ---
@@ -44,16 +47,16 @@ No code talk here. Just boxes and arrows so anyone can get it in 2 minutes.
    |         |        |   or GitHub)     |        |             |
    +---------+        +------------------+        +------+------+
                                                          |
-                               +-------------------------+-------------------------+
-                               |                                                   |
-                               v                                                   v
-                    +---------------------+                             +---------------------+
-                    |  1. Upload a policy |                             |  2. Ask a question  |
-                    |     (PDF / image)   |                             |   about your docs   |
-                    +---------------------+                             +---------------------+
+                     +-----------------------------------+-----------------------------------+
+                     |                                   |                                   |
+                     v                                   v                                   v
+          +---------------------+             +---------------------+             +---------------------+
+          |  1. Upload a policy |             |  2. Ask a question  |             |  3. Make a pitch    |
+          |     (PDF / image)   |             |   about your docs   |             |  deck from an idea  |
+          +---------------------+             +---------------------+             +---------------------+
 ```
 
-That's it. Two things: **put docs in**, and **ask questions out**.
+That's it. Three things: **put docs in**, **ask questions out**, and **turn an idea into a deck**.
 
 ---
 
@@ -157,25 +160,34 @@ You can watch the status move along on screen:
    Look at your earlier chat, so follow-up questions make sense
           |
           v
-   Make the question better:
-     - clean it up
-     - ask a bigger "step back" version
-     - split it into smaller questions
-     - guess what a good answer might look like
-          |
-          v
    +-----------------------------------------------+
-   | What kind of question is it?                  |
+   | What kind of message is it?                   |
+   | ("hi", "thanks", "bye" are spotted instantly, |
+   |  everything else is decided by a quick AI)    |
    +-----------------------------------------------+
-      |                     |                    |
-   about what's          about your files     both
-   INSIDE the docs       ("how many files?")
-      |                     |                    |
-      v                     v                    v
-   Search your doc      Check your file list   Do both
-   pieces (only YOURS)
-      |                     |                    |
-      +----------+----------+--------------------+
+      |               |                  |              |
+   just chatting   about what's       about your     both
+   ("hi", "thanks",  INSIDE the docs   files ("how
+   "what can you                       many files?")
+   do?", "what's
+   15% of 2400?")
+      |               |                  |              |
+      v               |                  |              |
+   Friendly short     |                  |              |
+   reply, no search,  |                  |              |
+   no sources needed  |                  |              |
+   (done!)            v                  |              |
+              Make the question better:  |              |
+                - clean it up            |              |
+                - ask a bigger "step back" version      |
+                - split it into smaller questions       |
+                - guess what a good answer looks like   |
+                      |                  |              |
+                      v                  v              v
+              Search your doc     Check your file    Do both
+              pieces (only YOURS) list
+                      |                  |              |
+                      +--------+---------+--------------+
                  |
                  v
    Mix all the results together and keep the best ones on top
@@ -205,6 +217,45 @@ You can watch the status move along on screen:
    Save the chat so you can come back to it later
 ```
 
+**Why "hi" is fast now:** greetings, thanks and general questions skip the question rewriting, Pinecone search and reranking (5+ AI calls), so they get a short, natural reply in about a second instead of "I couldn't find this in your documents". Real policy questions, even casual ones like "can I bring my dog to office?" or a follow-up like "and for interns?", still go to document search.
+
+---
+
+### Flow 3: Making a pitch deck
+
+```
+   You type a project idea (20+ characters)
+          |
+          v
+   Deck saved as "Queued"  -->  App says "Building your deck..."  <-- you can leave the page
+          |
+          v
+   ~~~~~~~~~~~~ the rest happens in the background (Inngest) ~~~~~~~~~~~~
+          |
+          v
+   AI writes 7 slides: Title, Problem, Solution, Market, Product, Business Model, The Ask
+   ...and plans ONE picture for each slide:
+      - teaching / learning ideas  -> diagrams, flowcharts, timelines
+      - other ideas                -> charts, product mockups, photos
+      - short labels spelled out exactly (e.g. "TAM $10B"), or no text at all
+          |
+          v
+   +------------------------------+
+   | Quality check: placeholder   |---- bad ----> Deck marked FAILED with a reason
+   | text, empty slides, unsafe?  |
+   +------------------------------+
+          | good
+          v
+   Draw ALL 7 pictures at the same time:
+     picture prompt -> OpenAI gpt-image-2 -> picture bytes -> upload to ImageKit -> link saved
+     (a hiccup is retried once on a backup model; a refused picture is skipped, the slide keeps its text)
+          |
+          v
+   Everything done? -> Deck becomes READY and opens   (about 20-30 seconds, ~4 cents)
+```
+
+While you wait you see the real progress: `Writing & checking slides -> Drawing images 4 / 7 -> Finishing up`.
+
 ---
 
 ### The golden rules
@@ -216,6 +267,8 @@ You can watch the status move along on screen:
    |  3. Every answer tells you which file and which page.    |
    |  4. Slow stuff runs in the background, so the app stays  |
    |     fast.                                                |
+   |  5. A deck is only shown when its text AND pictures are  |
+   |     all finished.                                        |
    +----------------------------------------------------------+
 ```
 
@@ -259,11 +312,19 @@ flowchart TD
     subgraph QueryEngine["Query & RAG Pipeline"]
         ChatRoute["/api/chat (POST Stream)"]
         InputGuard["Input Guardrail & Injection Classifier"]
+        Router["Intent Router (Chat / Content / Metadata / Both)"]
+        ChatReply["Chat Reply (greetings, general questions)"]
         Optimizer["Query Optimizer (HyDE, Step-Back, Sub-Queries)"]
-        Router["Intent Router (Content / Metadata / Both)"]
         RRF["Reciprocal Rank Fusion (RRF)"]
         Generator["GPT-4o-mini Answer Generator"]
         OutputGuard["Groundedness & Citation Verifier"]
+    end
+
+    subgraph DeckEngine["AI Pitch Deck (Inngest)"]
+        DeckRoute["/api/decks (HTTP 202)"]
+        DeckJob["generate-deck job"]
+        DeckAgent["Deck Agent (gpt-4.1-mini + guardrails)"]
+        ImageGen["Slide Images (gpt-image-2, all at once)"]
     end
 
     %% Client Interactions
@@ -288,10 +349,12 @@ flowchart TD
     UI --> ChatRoute
     ChatRoute --> Session
     ChatRoute --> InputGuard
-    InputGuard --> Optimizer
-    Optimizer --> Router
-    Router --> Pinecone
-    Router --> PG
+    InputGuard --> Router
+    Router -->|chat| ChatReply
+    ChatReply --> OutputGuard
+    Router -->|content / both| Optimizer
+    Optimizer --> Pinecone
+    Router -->|metadata / both| PG
     Pinecone --> RRF
     RRF --> Reranker
     Reranker --> Generator
@@ -299,6 +362,15 @@ flowchart TD
     OutputGuard --> PG
     OutputGuard --> SSE
     SSE --> UI
+
+    %% Pitch Deck Flow
+    UI --> DeckRoute
+    DeckRoute --> PG
+    DeckRoute -.->|Event: deck/generate-deck| DeckJob
+    DeckJob --> DeckAgent
+    DeckJob --> ImageGen
+    ImageGen --> IK
+    DeckJob --> PG
 ```
 
 ---
@@ -394,8 +466,10 @@ The query engine handles incoming questions through an orchestrated multi-stage 
 ```mermaid
 flowchart LR
     Q[User Prompt] --> S1[1. Input Guard]
-    S1 --> S2[2. Query Optimizer]
-    S2 --> S3[3. Multi-Route Dispatcher]
+    S1 --> S2[2. Intent Router]
+    S2 -->|chat| C[Chat Reply, no search]
+    C --> S9
+    S2 -->|content / metadata / both| S3[3. Query Optimizer]
     S3 --> S4[4. Pinecone Dense Retrieval]
     S4 --> S5[5. Reciprocal Rank Fusion]
     S5 --> S6[6. Cross-Encoder Reranker]
@@ -404,9 +478,9 @@ flowchart LR
     S8 --> S9[9. SSE Emitter & Save]
 
     subgraph OptimizerStage["Optimization Breakdown"]
-        S2 --- O1[HyDE Generation]
-        S2 --- O2[Step-Back Inquiry]
-        S2 --- O3[Sub-Query Splitting]
+        S3 --- O1[HyDE Generation]
+        S3 --- O2[Step-Back Inquiry]
+        S3 --- O3[Sub-Query Splitting]
     end
 
     subgraph GuardrailStage["Verification Breakdown"]
@@ -421,14 +495,69 @@ flowchart LR
 | Stage | Name | Description |
 | :---: | :--- | :--- |
 | **1** | **Input Guard** | Evaluates the user query against heuristic rules and an LLM-based injection classifier to intercept prompt leaks, jailbreaks, and instructions attempting to override system behavior. |
-| **2** | **Query Optimizer** | Expands the query into multiple search variants: **HyDE** (Hypothetical Document Embeddings for conceptual matching), **Step-Back Prompting** (high-level policy concepts), and **Sub-Queries** (multi-intent questions). |
-| **3** | **Intent Router** | Determines if the question queries document content, document metadata (e.g., "how many documents are uploaded?"), or both. |
+| **2** | **Intent Router** | Runs **before** optimization. Obvious small talk ("hi", "thanks", "bye", "what can you do?") is caught by an instant rule (`routing/detect-small-talk.ts`), with no AI call. Everything else goes to a fast model that picks **chat** (greetings, questions about the app, general questions), **content**, **metadata**, or **both**. It sees the last few turns, so "and for interns?" stays a document question. When unsure it picks content. |
+| **2b** | **Chat Reply** | For the chat route only: a short, friendly streamed reply (`prompts/chat-reply.prompt.ts`) using the fast model, with no search, no citations, and the user's ready document names to suggest example questions. General answers are labelled as general information, policy questions are never answered from general knowledge, and off-topic requests (e.g. writing code) are politely declined. The pipeline ends here. |
+| **3** | **Query Optimizer** | Expands the query into multiple search variants: **HyDE** (Hypothetical Document Embeddings for conceptual matching), **Step-Back Prompting** (high-level policy concepts), and **Sub-Queries** (multi-intent questions). |
 | **4** | **Dense Retrieval** | Executes multi-query vector searches in Pinecone under the user's isolated namespace (`{userId}`). |
 | **5** | **Reciprocal Rank Fusion** | Merges results across original, hypothetical, and sub-queries using RRF formula \(RRF(d) = \sum \frac{1}{k + r_i(d)}\), producing an integrated candidate ranking. |
 | **6** | **Pinecone Reranker** | Passes top candidate passages through `bge-reranker-v2-m3` cross-attention to discard low-relevance noise and retain the top \(N\) most authoritative chunks. |
 | **7** | **Streaming Generation** | Streams tokens using GPT-4o-mini with system constraints strictly prohibiting speculation and requiring inline bracketed citations (`[1]`, `[2]`). |
 | **8** | **Output Verification** | Verifies that all generated statements and citations match the source text chunks. If hallucination or unverifiable claims are detected, the response is replaced with a safe fallback notice. |
 | **9** | **Persistence & Finalization** | Saves the user message and assistant answer with structured citation metadata to PostgreSQL, triggers conversation list cache invalidation, and closes the SSE channel. |
+
+---
+
+## AI Pitch Deck Generator
+
+Code lives in `modules/pitch-deck/`, the background job in `inngest/functions/generate-deck.ts`, pages in `app/dashboard/decks/`, and UI in `components/decks/`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User Browser
+    participant API as /api/decks
+    participant PG as PostgreSQL (Prisma)
+    participant Inngest as Inngest (generate-deck)
+    participant Agent as Deck Agent (gpt-4.1-mini)
+    participant Img as OpenAI Images (gpt-image-2)
+    participant IK as ImageKit
+
+    User->>API: POST /api/decks { idea }
+    API->>PG: Create Deck (PENDING)
+    API->>Inngest: Send event: deck/generate-deck
+    API-->>User: HTTP 202 (deckId), page polls every 2.5s
+    Inngest->>PG: Deck GENERATING
+    Inngest->>Agent: Idea
+    Note over Agent: beforeAgent guardrail: idea >= 20 chars<br/>structured output: slides + picture plan<br/>afterAgent guardrail: quality checker
+    Agent-->>Inngest: 7 slides + image prompts
+    Inngest->>PG: Save slides (imageStatus PENDING), deck still GENERATING
+    par One Inngest step per slide, all at once
+        Inngest->>Img: Image prompt (1536x1024, quality low)
+        Img-->>Inngest: base64 PNG -> Buffer
+        Inngest->>IK: Upload to /deck-images/{userId}/{deckId}
+        IK-->>Inngest: URL + fileId
+        Inngest->>PG: Slide.imageUrl, imageStatus COMPLETE
+    end
+    Inngest->>PG: Deck COMPLETE (only now are slides returned by the API)
+```
+
+### How it works
+
+| Part | File | What it does |
+|---|---|---|
+| **Agent** | `pitch-deck-agent.ts` | LangChain `createAgent` with the deck system prompt, structured output (`PitchDeckOutputSchema`), and both guardrails as middleware. |
+| **Guardrails** | `guardrail.ts` | Input: rejects ideas under 20 characters (no AI call). Output: a second agent checks for placeholders, empty slides, and unsafe content. Any business topic is allowed. |
+| **Picture plan** | system prompt | Each slide gets a `visualType` (diagram, flowchart, timeline, chart, infographic, illustration, product_mockup, photo), a scene, and `imageText` labels. Educational ideas (`isEducational`) prefer diagrams, flowcharts and timelines. |
+| **Image prompt** | `image-prompt.ts` | Builds the final prompt: slide + visual style + scene + exact text rule + house style. Labels are short (max 6, 4 words each) and quoted with "spelled exactly"; no labels means "draw no letters at all". This prevents made-up text in images. |
+| **Image generator** | `image-generator.ts` | OpenAI Images API. A temporary failure (429/5xx, timeout, no image, missing model) is retried once on the fallback model. A refusal is not retried. Returns `ok` or a `refused` / `transient` / `error` reason. |
+| **Storage** | `image-storage.ts` | Uploads the Buffer to ImageKit (public, AI-made pictures only) and deletes them when a deck is deleted. |
+| **Job** | `generate-deck.ts` | Steps: load → GENERATING → write slides → save → `image-<slideId>` for every slide in parallel → COMPLETE. Steps return only URLs, never image bytes (Inngest step output has a size limit). Concurrency is 16 steps per user, so every image of a deck runs at once. |
+
+**Statuses.** Deck: `PENDING → GENERATING → COMPLETE` or `FAILED` (failed only if no slides were written). Slide image: `PENDING → COMPLETE`, `FAILED`, `REFUSED`, or `SKIPPED` (slides made before images existed).
+
+**Viewer.** A 16:9 slide player with arrow keys, thumbnails, fullscreen "Present", and "Copy as text". All sizes use container units (`cqw`), so the slide scales as one piece. Labelled pictures are never cropped (`object-contain` in a 3:2 frame), and long text shrinks instead of overflowing.
+
+**Cost and speed.** About $0.005 per image at `quality: low`, so about 4 cents per deck, ready in about 20–30 seconds.
 
 ---
 
@@ -443,8 +572,36 @@ erDiagram
     User ||--o{ Document : "owns"
     User ||--o{ Conversation : "owns"
 
+    User ||--o{ Deck : "owns"
+
     Document ||--o{ DocumentPage : "contains"
     Conversation ||--o{ Message : "contains"
+    Deck ||--o{ Slide : "contains"
+
+    Deck {
+        string id PK
+        string userId FK
+        string idea
+        string title
+        enum status "PENDING | GENERATING | COMPLETE | FAILED"
+        string errorMessage
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    Slide {
+        string id PK
+        string deckId FK
+        int order
+        string title
+        string content
+        string imagePrompt
+        string imageUrl
+        string imageFileId
+        enum imageStatus "PENDING | COMPLETE | FAILED | REFUSED | SKIPPED"
+        string imageError
+        datetime createdAt
+    }
 
     Document {
         string id PK
@@ -518,7 +675,7 @@ interface PineconeChunkRecord {
 ## Multi-Tenant Security & Privacy Model
 
 1. **Namespace Isolation in Vector Database**: Every Pinecone vector operation is strictly scoped to `namespace: user_${session.user.id}`. Cross-tenant retrieval is architecturally impossible at the query layer.
-2. **Private Cloud File Store**: Document uploads reside in private ImageKit folders (`/policy-docs/{userId}`). Files are inaccessible without server-signed authentication.
+2. **Private Cloud File Store**: Document uploads reside in private ImageKit folders (`/policy-docs/{userId}`). Files are inaccessible without server-signed authentication. AI-generated slide pictures (no user documents) are stored as public files in `/deck-images/{userId}/{deckId}` so slides can load them directly; they are deleted with their deck.
 3. **Database Row-Level Verification**: All Prisma queries for documents, pages, conversations, and messages filter by `userId: session.user.id`.
 4. **Prompt Injection Hardening**: All user inputs pass through a multi-layer guardrail before hitting retrieval or generation models.
 5. **Redaction & Privacy by Default**: Document text, vectors, and citation payloads are never exposed to client logs or analytics pipelines.
@@ -550,7 +707,9 @@ The interface is inspired by the **Family.co** product aesthetic: calm, spacious
 | **Vector Engine** | Pinecone Serverless | 9.2.0 | Multi-tenant dense vector index with namespaces |
 | **Reranker** | Pinecone Rerank | `bge-reranker-v2-m3` | Cross-encoder relevance re-scoring |
 | **Embeddings** | Pinecone integrated embedding | model set on the index | Pinecone embeds `chunk_text` on upsert and on search; no app-side embedding calls |
-| **LLM Inference** | OpenAI | `gpt-4o-mini` | Query optimization, guardrails, and streaming answer generation |
+| **LLM Inference** | OpenAI | `gpt-4o-mini` | Query optimization, routing, guardrails, chat replies, and streaming answer generation |
+| **Agents** | LangChain (`langchain`) | 1.6.7 | Pitch deck agent with structured output and guardrail middleware (`gpt-4.1-mini`) |
+| **Image Generation** | OpenAI Images | `gpt-image-2` (fallback `gpt-image-1.5`) | Slide diagrams, charts and pictures at `quality: low` |
 | **Document Storage** | ImageKit | 2.1.6 / 7.15.0 | Private cloud file hosting and direct-upload signing |
 | **PDF Processing** | PDF.js | 6.5.438 | Digital PDF text extraction and page parsing |
 | **Canvas & OCR** | @napi-rs/canvas + Tesseract.js | 1.1.1 / 7.0.0 | Page rendering, OCR with a reused worker pool, and citation page previews |
@@ -587,8 +746,13 @@ IMAGEKIT_URL_ENDPOINT="https://ik.imagekit.io/your-id"
 PINECONE_API_KEY="your-pinecone-api-key"
 PINECONE_INDEX="your-pinecone-index-name"  # index with integrated embedding on field chunk_text
 
-# LLM for chat answers (OpenAI)
+# LLM for chat answers and pitch decks (OpenAI)
 OPENAI_API_KEY="your-openai-api-key"
+
+# Pitch deck slide images (optional, blank = default)
+# DECK_IMAGE_MODEL="gpt-image-2"
+# DECK_IMAGE_FALLBACK_MODEL="gpt-image-1.5"   # set to "" to turn the retry off
+# DECK_IMAGE_QUALITY="low"                    # low (cheapest, fastest) | medium | high
 
 # Indexing speed knobs (optional, see "Indexing Tuning")
 PAGE_BATCH_SIZE=10
