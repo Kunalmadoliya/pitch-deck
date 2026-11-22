@@ -1,5 +1,6 @@
 export type QueryKind = "rewrite" | "step-back" | "sub-query" | "hyde";
-export type QueryRoute = "content" | "metadata" | "both";
+/** chat = greetings, thanks, questions about the assistant, or general questions that need no document search. */
+export type QueryRoute = "content" | "metadata" | "both" | "chat";
 export type MetadataIntent = "list_documents" | "count_documents" | "document_status" | "recent_documents";
 
 export interface HistoryMessage { role: "USER" | "ASSISTANT"; content: string }

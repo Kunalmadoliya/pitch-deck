@@ -1,6 +1,7 @@
 import { runInputGuard } from "../guardrails/input/run-input-guard";
 import { buildContext } from "../generation/build-context";
 import { generateAnswer } from "../generation/generate-answer";
+import { generateChatReply } from "../generation/generate-chat-reply";
 import { loadHistory } from "../history/load-history";
 import { optimizeQuery } from "../optimization/optimize-query";
 import { selectTopK } from "../optimization/select-top-k";
@@ -26,11 +27,23 @@ export async function* runQueryPipeline(input: {
     yield { type: "status", stage };
     const safeMessage = await runInputGuard(input.message);
     const history: HistoryMessage[] = await loadHistory(input.conversationId, input.userId);
+    // Route BEFORE optimizing: greetings and general questions skip query rewriting and search entirely.
+    const route = await routeQuery(safeMessage, history);
+    if (route.route === "chat") {
+      stage = "generating";
+      yield { type: "status", stage };
+      let reply = "";
+      for await (const token of generateChatReply(input.userId, safeMessage, history, input.signal)) {
+        reply += token; yield { type: "token", text: token };
+      }
+      // No chunks: the output guard passes it through without citation checks.
+      yield { type: "complete", answer: reply, chunks: [], context: "", citations: [] };
+      return;
+    }
     stage = "optimizing";
     yield { type: "status", stage };
     const optimized = await optimizeQuery(safeMessage, history);
     const queries = selectTopK(optimized);
-    const route = await routeQuery(safeMessage);
     stage = "retrieving";
     yield { type: "status", stage };
     const lists = route.route === "metadata" ? [] : await contentAdapter(input.userId, queries, input.documentIds);
