@@ -78,44 +78,61 @@ That's it. Two things: **put docs in**, and **ask questions out**.
    ~~~~~~~~~~~~ the rest happens in the background ~~~~~~~~~~~~
           |
           v
-   Count the pages, then take them 3 at a time
+   Download the file ONCE (kept in memory for the next steps)
           |
           v
-   +---------------------------+
-   | Can we read the text on   |
-   | this page directly?       |
-   +---------------------------+
-       |                 |
-      yes               no (it's a scan / photo)
-       |                 |
-       v                 v
-   Grab the text     Read it like a human would (OCR)
-       |                 |
-       +--------+--------+
-                |
-                v
-   Cut the text into small bite-size pieces
-                |
-                v
-   Turn each piece into "meaning numbers"
-   (so the app can find stuff by meaning, not just exact words)
-                |
-                v
-   Store them in the search memory, tagged with YOUR name only
-                |
-                v
-   More pages left? ---- yes ---> go back and do the next 3
-                |
-               no
-                v
-   Status becomes  DONE  -- ready to ask questions!
+   Count the pages, then take them 10 at a time
+   (open the PDF ONCE for each group of 10)
+          |
+          v
+   Work on several pages AT THE SAME TIME, like an assembly line:
 
-   (If something breaks, it tries again up to 3 times.
-    If it still fails, the doc is marked FAILED with a reason.)
+     page 1:  read -> cut into pieces -> save to search -> done ✓
+     page 2:  read -> cut into pieces -> save to search -> done ✓
+     page 3:  read -> cut into pieces -> save to search -> done ✓
+       ...      (page 1 is searchable while page 3 is still being read)
+
+          "read" means:
+          +---------------------------+
+          | Can we read the text on   |
+          | this page directly?       |
+          +---------------------------+
+              |                 |
+             yes               no (it's a scan / photo)
+              |                 |
+              v                 v
+          Grab the text     Draw the page as a picture and let a
+          (super fast)      Tesseract reader read it (OCR)
+                            -- a small team of readers is started
+                               ONCE and reused for every page
+
+          "save to search" means:
+          Send the pieces to Pinecone, tagged with YOUR name only.
+          Pinecone turns them into "meaning numbers" itself, so the app
+          can find stuff by meaning, not just exact words.
+          |
+          v
+   More pages left? ---- yes ---> next group of 10
+          |
+         no
+          v
+   Status becomes  DONE  -- ready to ask questions!
+   You also see how long it took, like "Indexed in 14s · 1.2s/page"
+
+   (If something breaks, it tries again up to 3 times -- pages that
+    were already done are not counted twice. If it still fails, the
+    doc is marked FAILED with a reason.)
 ```
 
 You can watch the status move along on screen:
-`QUEUED -> INSPECTING -> EXTRACTING -> CHUNKING -> EMBEDDING -> UPSERTING -> DONE`
+`QUEUED -> INSPECTING -> READING & INDEXING PAGES (x of y pages) -> DONE`
+
+**Why it's fast now**
+
+```
+ OLD:  [download][open pdf][page1][open pdf][page2]...  one by one, new OCR reader every page
+ NOW:  [download once][open once] -> page1 | page2 | page3 | page4   (side by side, readers reused)
+```
 
 ---
 
@@ -229,13 +246,13 @@ flowchart TD
         DocReg["/api/documents (HTTP 202)"]
         Worker["Inngest Background Orchestrator"]
         PDFParser["PDF.js Text Extractor"]
-        OCR["@napi-rs/canvas + Tesseract.js"]
+        OCR["@napi-rs/canvas + Tesseract.js worker pool"]
         Chunker["Page-Boundary Clause Splitter"]
-        Embedder["OpenAI text-embedding-3-small"]
+        FileCache["In-Memory File Cache (download once)"]
     end
 
     subgraph VectorEngine["Vector Storage & Reranking"]
-        Pinecone[("Pinecone Serverless Index")]
+        Pinecone[("Pinecone Index (integrated embedding)")]
         Reranker["Pinecone BGE Reranker (bge-reranker-v2-m3)"]
     end
 
@@ -258,13 +275,13 @@ flowchart TD
     DocReg -.->|Event: document.uploaded| Worker
 
     %% Ingestion Flow
-    Worker --> IK
+    Worker --> FileCache
+    FileCache --> IK
     Worker --> PDFParser
     PDFParser -.->|Low Text Density| OCR
     PDFParser --> Chunker
     OCR --> Chunker
-    Chunker --> Embedder
-    Embedder --> Pinecone
+    Chunker --> Pinecone
     Worker --> PG
 
     %% Query Flow
@@ -288,7 +305,7 @@ flowchart TD
 
 ## Ingestion & Indexing Pipeline (Asynchronous)
 
-All heavy document processing runs out-of-band via Inngest step functions. API routes never perform OCR, embedding, or parsing synchronously.
+All heavy document processing runs out-of-band via Inngest step functions. API routes never perform OCR, chunking, or parsing synchronously. Inside each step, pages flow through an assembly line: every page is extracted, chunked and upserted on its own, so it becomes searchable as soon as it is finished.
 
 ```mermaid
 sequenceDiagram
@@ -298,52 +315,75 @@ sequenceDiagram
     participant IK as ImageKit Storage
     participant Inngest as Inngest Orchestrator
     participant PG as PostgreSQL (Prisma)
-    participant OpenAI as OpenAI API
-    participant Pinecone as Pinecone Vector DB
+    participant Pinecone as Pinecone (integrated embedding)
 
     User->>API: GET /api/upload-auth
     API-->>User: Ephemeral upload signature & token
     User->>IK: Direct upload to /policy-docs/{userId}
     IK-->>User: fileId, filePath, sizeBytes
     User->>API: POST /api/documents (receipt)
-    API->>PG: Create Document (status: UPLOADED)
-    API->>Inngest: Send event: document.uploaded
+    API->>IK: Verify file metadata & ownership
+    API->>PG: Create Document (status: UPLOADED, stage: QUEUED)
+    API->>Inngest: Send event: document/uploaded
     API-->>User: HTTP 202 Accepted (documentId)
 
-    Note over Inngest,Pinecone: Background Pipeline Begins
-    Inngest->>PG: Update stage: INSPECTING
-    Inngest->>IK: Fetch file binary stream
+    Note over Inngest,Pinecone: Background pipeline begins
+    Inngest->>IK: Download file once (kept in in-memory cache)
     Inngest->>Inngest: Validate magic bytes & MIME type
-    Inngest->>Inngest: Count pages via PDF.js
+    Inngest->>Inngest: Open PDF once, count pages
+    Inngest->>PG: stage: INSPECTING, pageCount
 
-    loop For each page batch (Batch size = 10)
-        Inngest->>PG: Update stage: EXTRACTING
-        alt Page has digital text
-            Inngest->>Inngest: Extract text layer via PDF.js
-        else Scanned image or low character density
-            Inngest->>Inngest: Render to canvas (@napi-rs/canvas)
-            Inngest->>Inngest: Run OCR with Tesseract.js
+    loop For each page batch (PAGE_BATCH_SIZE = 10, one Inngest step each)
+        Inngest->>Inngest: Reuse cached file, open PDF once for the batch
+        Inngest->>PG: stage: EXTRACTING
+        par Several pages at once (OCR pool size + 1)
+            alt Page has a digital text layer
+                Inngest->>Inngest: Read text layer via PDF.js
+            else Scanned page or image
+                Inngest->>Inngest: Render page (@napi-rs/canvas, async encode)
+                Inngest->>Inngest: OCR with shared Tesseract.js worker pool
+            end
+            Inngest->>Inngest: Chunk page (1000 chars, 150 overlap)
+            Inngest->>Pinecone: Upsert chunk_text into namespace {userId}
+            Note over Pinecone: Pinecone embeds chunk_text itself
+            Inngest->>PG: Save DocumentPage + bump progress (transaction)
         end
-        Inngest->>Inngest: Split into clause chunks (Max 800 chars, 100 overlap)
-        Note over Inngest: Chunks strictly preserve pageNumber
-        Inngest->>PG: Update stage: EMBEDDING
-        Inngest->>OpenAI: Generate embeddings (text-embedding-3-small, 1536 dims)
-        OpenAI-->>Inngest: Vector embeddings array
-        Inngest->>PG: Update stage: UPSERTING
-        Inngest->>Pinecone: Upsert vectors into namespace user_{userId}
-        Inngest->>PG: Record DocumentPage records
     end
 
-    Inngest->>PG: Set Document status: INDEXED, stage: DONE
-    Inngest-->>User: TanStack Query poll receives INDEXED state
+    Inngest->>PG: status: INDEXED, stage: DONE, indexedAt
+    Inngest-->>User: TanStack Query poll shows "Indexed in Xs · Ys/page"
 ```
 
 ### Ingestion Pipeline Highlights
 
 1. **Direct-to-Cloud Upload**: Files bypass the Next.js application server entirely during upload, preventing memory bloat and execution timeouts on serverless runtimes.
-2. **Selective OCR Fallback**: Digital PDFs are parsed with PDF.js in milliseconds. Tesseract.js OCR is dynamically invoked only for scanned pages or images where text density falls below the threshold.
-3. **Strict Page-Boundary Chunking**: Chunks never cross page boundaries. Every chunk explicitly carries its source `pageNumber`, `documentId`, `fileName`, and `chunkIndex`, ensuring citations point to verifiable physical pages.
-4. **Deterministic Vector IDs**: Vectors are upserted with IDs formatted as `${documentId}:${pageNumber}:${chunkIndex}`. Re-indexing a document overwrites existing records idempotently without duplicates.
+2. **Download Once, Open Once**: The file is downloaded a single time and cached in memory (`storage/read-file-cached.ts`, 10 min, up to 3 files), so later batch steps on the same server reuse it. Each batch opens the PDF a single time and reads every page from it (`extraction/open-pdf.ts`). If a step lands on a different server, it just downloads again.
+3. **Selective OCR with a Reused Worker Pool**: Digital PDF pages are read from the text layer in milliseconds. Only pages with fewer than `OCR_TEXT_THRESHOLD` characters (scans, photos) are rendered and sent to OCR. Tesseract workers are started once, shared through a scheduler (`extraction/ocr-pool.ts`), and shut down after 60s idle. In a local test this read 4 scanned pages in ~4s instead of ~13.5s.
+4. **Assembly-Line Pages**: Inside a batch, pages run in parallel (`OCR pool size + 1` at a time). Each page is chunked and upserted the moment it is read, so a long document becomes searchable page by page.
+5. **Pinecone Integrated Embedding**: Chunks are upserted as `chunk_text` and Pinecone generates the vectors itself. There is no separate OpenAI embedding call during indexing.
+6. **Strict Page-Boundary Chunking**: Chunks never cross page boundaries. Every chunk carries its source `pageNumber`, `documentId`, `fileName`, and `chunkIndex`, so citations point to real pages (and power the hover page preview in chat).
+7. **Deterministic Vector IDs & Retry-Safe Progress**: Vectors use IDs `${documentId}:${pageNumber}:${chunkIndex}`, so a retry overwrites instead of duplicating. Page progress is recorded in a transaction that never counts the same page twice.
+8. **Speed You Can See**: Logs emit `timing:page` (extract / OCR / upsert ms), `timing:batch` (download, open, ms per page) and `timing:document` (total). The UI shows "Indexed in 14s · 1.2s/page" for each finished document.
+
+### Indexing Tuning
+
+| Variable | Default | What it does |
+|---|---|---|
+| `PAGE_BATCH_SIZE` | `10` | Pages per Inngest step. Lower it (3–5) on serverless hosts with short time limits. |
+| `OCR_WORKERS` | CPU cores − 1 (1–4) | Tesseract workers kept alive and reused. Lower it (e.g. `2`) if OCR runs out of memory. |
+| `PDF_RENDER_SCALE` | `2` | How big scanned pages are drawn before OCR. Lower is faster but may miss tiny text. |
+| `OCR_TEXT_THRESHOLD` | `50` | Pages with fewer characters than this in the text layer are treated as scanned. |
+| `CHUNK_SIZE` / `CHUNK_OVERLAP` | `1000` / `150` | Size of each text piece and how much neighbouring pieces overlap. |
+| `OCR_LANG` | `eng` | OCR language. `eng.traineddata` in the project root is used, so nothing is downloaded at runtime. |
+
+### Deploying Indexing on Vercel
+
+pdf.js and Tesseract load some files by paths built at runtime, which Vercel's file tracing cannot see. The project handles this for you:
+
+- `extraction/open-pdf.ts` imports `pdf.worker.mjs` directly, so it is bundled and used in-process.
+- `next.config.ts` lists the Tesseract worker script, `tesseract.js-core` wasm files, their dependencies, and `eng.traineddata` in `outputFileTracingIncludes` for `/api/inngest`.
+
+On a long-running server (Railway, Render, a VPS) the file cache and OCR pool are reused across steps and documents. On serverless each step may start fresh, so it is slower but still works.
 
 ---
 
@@ -383,7 +423,7 @@ flowchart LR
 | **1** | **Input Guard** | Evaluates the user query against heuristic rules and an LLM-based injection classifier to intercept prompt leaks, jailbreaks, and instructions attempting to override system behavior. |
 | **2** | **Query Optimizer** | Expands the query into multiple search variants: **HyDE** (Hypothetical Document Embeddings for conceptual matching), **Step-Back Prompting** (high-level policy concepts), and **Sub-Queries** (multi-intent questions). |
 | **3** | **Intent Router** | Determines if the question queries document content, document metadata (e.g., "how many documents are uploaded?"), or both. |
-| **4** | **Dense Retrieval** | Executes multi-query vector searches in Pinecone under the user's isolated namespace (`user_{userId}`). |
+| **4** | **Dense Retrieval** | Executes multi-query vector searches in Pinecone under the user's isolated namespace (`{userId}`). |
 | **5** | **Reciprocal Rank Fusion** | Merges results across original, hypothetical, and sub-queries using RRF formula \(RRF(d) = \sum \frac{1}{k + r_i(d)}\), producing an integrated candidate ranking. |
 | **6** | **Pinecone Reranker** | Passes top candidate passages through `bge-reranker-v2-m3` cross-attention to discard low-relevance noise and retain the top \(N\) most authoritative chunks. |
 | **7** | **Streaming Generation** | Streams tokens using GPT-4o-mini with system constraints strictly prohibiting speculation and requiring inline bracketed citations (`[1]`, `[2]`). |
@@ -455,22 +495,21 @@ erDiagram
 
 ### Pinecone Vector Schema
 
-Every embedding stored in Pinecone is tagged with rich metadata to facilitate hybrid filtering and grounded attribution:
+Records are upserted into a Pinecone index with **integrated embedding**: the app sends `chunk_text` and Pinecone creates the vector. Each user gets their own namespace (`{userId}`), and every record carries metadata for citations:
 
 ```typescript
 interface PineconeChunkRecord {
-  id: string; // Deterministic: `${documentId}:${pageNumber}:${chunkIndex}`
-  values: number[]; // 1536-dimensional embedding vector
-  metadata: {
-    documentId: string; // Foreign key to PostgreSQL Document
-    userId: string; // Tenant identifier
-    fileName: string; // Human-readable file name
-    pageNumber: number; // Physical page number (1-indexed)
-    chunkIndex: number; // Index of chunk within page
-    text: string; // Raw textual content of the clause
-    charCount: number; // Character count of the clause
-    createdAt: string; // ISO-8601 timestamp
-  };
+  _id: string; // Deterministic: `${documentId}:${pageNumber}:${chunkIndex}`
+  chunk_text: string; // Text Pinecone embeds and searches
+  title: string; // File name, shown in citations
+  documentId: string; // Foreign key to PostgreSQL Document
+  userId: string; // Tenant identifier (also the namespace)
+  fileName: string; // Human-readable file name
+  pageNumber: number; // Physical page number (1-indexed)
+  chunkIndex: number; // Index of chunk within the page
+  source: "text-layer" | "ocr"; // How the page text was obtained
+  ocrConfidence: number; // Tesseract confidence (0 for text-layer pages)
+  text: string; // Raw text of the chunk
 }
 ```
 
@@ -510,11 +549,11 @@ The interface is inspired by the **Family.co** product aesthetic: calm, spacious
 | **Background Jobs** | Inngest | 4.26.2 | Event-driven background orchestrator for slow tasks |
 | **Vector Engine** | Pinecone Serverless | 9.2.0 | Multi-tenant dense vector index with namespaces |
 | **Reranker** | Pinecone Rerank | `bge-reranker-v2-m3` | Cross-encoder relevance re-scoring |
-| **Embeddings** | OpenAI | `text-embedding-3-small` | 1536-dimensional semantic embeddings |
+| **Embeddings** | Pinecone integrated embedding | model set on the index | Pinecone embeds `chunk_text` on upsert and on search; no app-side embedding calls |
 | **LLM Inference** | OpenAI | `gpt-4o-mini` | Query optimization, guardrails, and streaming answer generation |
 | **Document Storage** | ImageKit | 2.1.6 / 7.15.0 | Private cloud file hosting and direct-upload signing |
 | **PDF Processing** | PDF.js | 6.5.438 | Digital PDF text extraction and page parsing |
-| **Canvas & OCR** | @napi-rs/canvas + Tesseract.js | 1.1.1 / 7.0.0 | Server-side page image rasterization and OCR fallback |
+| **Canvas & OCR** | @napi-rs/canvas + Tesseract.js | 1.1.1 / 7.0.0 | Page rendering, OCR with a reused worker pool, and citation page previews |
 | **State & Cache** | TanStack React Query | 5.107.1 | Client data fetching, caching, polling, and optimistic updates |
 | **Animation** | Motion (Framer Motion) | 14.14.0 | 60fps spring transitions, layout morphing, and status fades |
 | **Test Suite** | Vitest | 5.1.0 | Fast, isolated unit and integration test suite |
@@ -546,10 +585,15 @@ IMAGEKIT_URL_ENDPOINT="https://ik.imagekit.io/your-id"
 
 # Vector Search (Pinecone)
 PINECONE_API_KEY="your-pinecone-api-key"
-PINECONE_INDEX_NAME="your-pinecone-index-name"
+PINECONE_INDEX="your-pinecone-index-name"  # index with integrated embedding on field chunk_text
 
-# LLM & Embedding Models (OpenAI)
+# LLM for chat answers (OpenAI)
 OPENAI_API_KEY="your-openai-api-key"
+
+# Indexing speed knobs (optional, see "Indexing Tuning")
+PAGE_BATCH_SIZE=10
+OCR_WORKERS=
+PDF_RENDER_SCALE=2
 
 # Inngest Background Orchestration
 INNGEST_EVENT_KEY="your-inngest-event-key"

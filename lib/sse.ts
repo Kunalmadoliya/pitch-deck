@@ -1,4 +1,4 @@
-import { z } from "zod";
+import {z} from "zod";
 import type {
   ChatStatusEvent,
   ChatTokenEvent,
@@ -136,10 +136,10 @@ export async function parseSSEStream(
 
   try {
     while (!signal?.aborted) {
-      const { done, value } = await reader.read();
+      const {done, value} = await reader.read();
       if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, {stream: true});
       const blocks = buffer.split(/\r?\n\r?\n/);
       buffer = blocks.pop() ?? "";
 
