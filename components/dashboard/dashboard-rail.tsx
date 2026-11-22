@@ -47,6 +47,11 @@ export function DashboardRail({ user }: DashboardRailProps) {
       href: "/dashboard/rag/chat",
       active: pathname.startsWith("/dashboard/rag/chat"),
     },
+    {
+      label: "AI Pitch Deck",
+      href: "/dashboard/decks",
+      active: pathname.startsWith("/dashboard/decks"),
+    },
   ];
 
   return (

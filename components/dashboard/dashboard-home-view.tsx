@@ -62,9 +62,10 @@ export function DashboardHomeView({ userName }: DashboardHomeViewProps) {
 
         <ProductTile
           title="AI Pitch Deck"
-          description="Autonomous investor slide builder that transforms product memos, financials, and market data into presentation-ready storyboards."
-          badge="Coming soon"
-          disabled
+          description="Describe a project idea and get a 7-slide investor deck: problem, solution, market, product, business model and the ask."
+          badge="New"
+          href="/dashboard/decks"
+          ctaText="Open pitch decks"
         />
       </section>
 

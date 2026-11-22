@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ArrowUp, Square } from "lucide-react";
 import { MAX_QUERY_CHARS } from "@/lib/api/chat-types";
-import { ScopePicker } from "./scope-picker";
+import { ScopePicker, SelectedFileChips } from "./scope-picker";
 
 interface ComposerProps {
   onSend: (message: string, documentIds?: string[]) => void;
@@ -49,6 +49,11 @@ export function Composer({ onSend, onStop, isStreaming, disabled }: ComposerProp
   return (
     <div className="w-full space-y-1.5 max-w-3xl mx-auto">
       <div className="relative rounded-3xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-sm focus-within:border-blue-500/80 dark:focus-within:border-blue-400/80 focus-within:ring-2 focus-within:ring-blue-500/15 p-2 sm:p-2.5 transition-all">
+        <SelectedFileChips
+          selectedIds={selectedDocIds}
+          onChange={setSelectedDocIds}
+          disabled={isStreaming || disabled}
+        />
         <textarea
           ref={textareaRef}
           value={input}
